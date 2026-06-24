@@ -21,7 +21,7 @@ use Psr\Log\LoggerInterface;
  *
  * The actual order status update happens in the Webhook controller.
  */
-class Return implements HttpGetActionInterface
+class ReturnAction implements HttpGetActionInterface
 {
     public function __construct(
         private readonly RequestInterface $request,

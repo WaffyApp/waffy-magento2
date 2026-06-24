@@ -49,11 +49,12 @@ class Start implements HttpGetActionInterface
             $request = $this->buildCheckoutRequest($order);
             $result  = $this->orchestratorFactory->create((int) $order->getStoreId())->initiateCheckout($request);
 
-            // Store paymentUrl in session so the return controller can access it if needed
-            $this->checkoutSession->setWaffyPaymentUrl($result->paymentUrl);
+            $finalUrl = $result->paymentUrl . '&userTokenUrl=' . urlencode($result->customerToken);
+
+            $this->checkoutSession->setWaffyPaymentUrl($finalUrl);
 
             $redirect = $this->redirectFactory->create();
-            $redirect->setUrl($result->paymentUrl);
+            $redirect->setUrl($finalUrl);
             return $redirect;
 
         } catch (AuthException | ApiException $e) {
@@ -132,14 +133,16 @@ class Start implements HttpGetActionInterface
             . 'waffy/checkout/return?order_id=' . $order->getIncrementId();
 
         return new CheckoutRequest(
-            clientId:     $clientId,
-            clientSecret: $clientSecret,
-            customer:     $customer,
-            product:      $product,
-            milestone:    $milestone,
-            parties:      $parties,
-            redirectUrl:  $returnUrl,
-            paymentType:  $this->config->getPaymentType($storeId),
+            clientId:            $clientId,
+            clientSecret:        $clientSecret,
+            clientAdminEmail:    $this->config->getClientAdminEmail($storeId),
+            clientAdminPassword: $this->config->getClientAdminPassword($storeId),
+            customer:            $customer,
+            product:             $product,
+            milestone:           $milestone,
+            parties:             $parties,
+            redirectUrl:         $returnUrl,
+            paymentType:         $this->config->getPaymentType($storeId),
         );
     }
 

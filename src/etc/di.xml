@@ -6,4 +6,13 @@
     <preference for="Waffy\Ecommerce\Contract\TokenStore"
                 type="Waffy\Payment\Model\TokenStore"/>
 
+    <!-- Register CLI commands -->
+    <type name="Magento\Framework\Console\CommandList">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="waffy_checkout_test" xsi:type="object">Waffy\Payment\Console\Command\TestCheckoutCommand</item>
+            </argument>
+        </arguments>
+    </type>
+
 </config>

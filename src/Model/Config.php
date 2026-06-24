@@ -56,6 +56,21 @@ class Config
         return (string) $this->getValue('merchant_phone', $storeId);
     }
 
+    public function getClientAdminEmail(?int $storeId = null): string
+    {
+        return (string) $this->getValue('client_admin_email', $storeId);
+    }
+
+    /** Returns the decrypted client admin password. */
+    public function getClientAdminPassword(?int $storeId = null): string
+    {
+        $encrypted = (string) $this->getValue('client_admin_password', $storeId);
+        if ($encrypted === '') {
+            return '';
+        }
+        return $this->encryptor->decrypt($encrypted);
+    }
+
     public function getReturnPolicy(?int $storeId = null): string
     {
         return (string) $this->getValue('return_policy', $storeId) ?: 'NO_RETURN';

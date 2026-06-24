@@ -37,6 +37,17 @@
                     <comment>E.164 format, e.g. +966555555555. Used as the PROVIDER party in every contract.</comment>
                     <validate>required-entry</validate>
                 </field>
+                <field id="client_admin_email" translate="label comment" type="text" sortOrder="55" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Client Admin Email</label>
+                    <comment>Waffy admin account email provided to your merchant account.</comment>
+                    <validate>required-entry validate-email</validate>
+                </field>
+                <field id="client_admin_password" translate="label comment" type="obscure" sortOrder="56" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Client Admin Password</label>
+                    <comment>Stored encrypted. Used for merchant-level admin operations.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <validate>required-entry</validate>
+                </field>
 
                 <!-- Contract settings -->
                 <field id="return_policy" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
