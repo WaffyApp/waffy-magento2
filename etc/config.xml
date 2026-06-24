@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <payment>
+            <waffy_payment>
+                <active>0</active>
+                <title>Pay with Waffy</title>
+                <model>Waffy\Payment\Model\Payment</model>
+                <order_status>pending_payment</order_status>
+                <allowspecific>0</allowspecific>
+                <client_id></client_id>
+                <client_secret></client_secret>
+                <merchant_phone></merchant_phone>
+                <return_policy>NO_RETURN</return_policy>
+                <return_fee_payee>PROVIDER</return_fee_payee>
+                <is_deliverable>0</is_deliverable>
+                <is_inspectable>0</is_inspectable>
+                <is_acceptable>0</is_acceptable>
+                <milestone_deadline_days>30</milestone_deadline_days>
+                <category>Services</category>
+                <payment_type>PURCHASE</payment_type>
+                <auth_base_url>https://dev-auth.waffyapp.com</auth_base_url>
+                <api_base_url>https://dev-api.waffyapp.com</api_base_url>
+            </waffy_payment>
+        </payment>
+    </default>
+</config>

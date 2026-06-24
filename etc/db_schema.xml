@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+
+    <!-- Stores merchant and customer OAuth tokens (encrypted). -->
+    <table name="waffy_token" resource="default" engine="innodb" comment="Waffy OAuth Token Cache">
+        <column xsi:type="int" name="token_id" unsigned="true" nullable="false" identity="true" comment="Token ID"/>
+        <!-- 'merchant' or 'customer' -->
+        <column xsi:type="varchar" name="entity_type" nullable="false" length="16" comment="Token scope: merchant or customer"/>
+        <!-- clientId (merchant) or clientUserId (customer) -->
+        <column xsi:type="varchar" name="entity_id" nullable="false" length="255" comment="Scope-specific identifier"/>
+        <!-- AES-256 encrypted via Magento EncryptorInterface -->
+        <column xsi:type="text" name="token" nullable="false" comment="Encrypted access token"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Last updated"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="token_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="WAFFY_TOKEN_ENTITY_TYPE_ENTITY_ID">
+            <column name="entity_type"/>
+            <column name="entity_id"/>
+        </constraint>
+    </table>
+
+</schema>

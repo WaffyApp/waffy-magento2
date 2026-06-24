@@ -1,2 +1,21 @@
-magento-test
+# Composer
+vendor/
+composer.lock
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test environment
+magento-test/
+
+# Build
+node_modules/

@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <section id="payment">
+            <group id="waffy_payment" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Waffy Escrow Payment</label>
+                <comment>Contact Waffy Support Team at support@waffyapp.com to obtain your Client ID and Client Secret.</comment>
+                <fieldset_css>complex</fieldset_css>
+                <frontend_model>Magento\Paypal\Block\Adminhtml\System\Config\Fieldset\Payment</frontend_model>
+
+                <!-- Enable / Title -->
+                <field id="active" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Enabled</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="title" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Title</label>
+                </field>
+
+                <!-- API Credentials -->
+                <field id="client_id" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Client ID</label>
+                    <comment>Provided by Waffy. Contact support@waffyapp.com to get yours.</comment>
+                    <validate>required-entry</validate>
+                </field>
+                <field id="client_secret" translate="label comment" type="obscure" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Client Secret</label>
+                    <comment>Stored encrypted. Never share this value.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <validate>required-entry</validate>
+                </field>
+
+                <!-- Merchant identity -->
+                <field id="merchant_phone" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Merchant Phone Number</label>
+                    <comment>E.164 format, e.g. +966555555555. Used as the PROVIDER party in every contract.</comment>
+                    <validate>required-entry</validate>
+                </field>
+
+                <!-- Contract settings -->
+                <field id="return_policy" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Return Policy</label>
+                    <source_model>Waffy\Payment\Model\Config\Source\ReturnPolicy</source_model>
+                </field>
+                <field id="return_fee_payee" translate="label" type="select" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Return Fee Payee</label>
+                    <source_model>Waffy\Payment\Model\Config\Source\ReturnFeePayee</source_model>
+                </field>
+                <field id="is_deliverable" translate="label comment" type="select" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Is Deliverable</label>
+                    <comment>Product requires physical delivery.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="is_inspectable" translate="label comment" type="select" sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Is Inspectable</label>
+                    <comment>Buyer can inspect goods before funds are released.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="is_acceptable" translate="label comment" type="select" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Is Acceptable (by Customer)</label>
+                    <comment>Buyer explicitly accepts/rejects before funds are released.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="milestone_deadline_days" translate="label comment" type="text" sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Milestone Deadline (days)</label>
+                    <comment>Days from order date until the payment milestone expires. Default: 30.</comment>
+                    <validate>validate-digits validate-greater-than-zero</validate>
+                </field>
+                <field id="category" translate="label comment" type="text" sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Contract Category</label>
+                    <comment>Category shown to the buyer on the Waffy payment page. E.g. Services, Electronics, Food.</comment>
+                </field>
+
+                <!-- Standard Magento fields -->
+                <field id="order_status" translate="label" type="select" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>New Order Status</label>
+                    <source_model>Magento\Sales\Model\Config\Source\Order\Status\NewStatus</source_model>
+                </field>
+                <field id="allowspecific" translate="label" type="allowspecific" sortOrder="140" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Payment from Applicable Countries</label>
+                    <source_model>Magento\Payment\Model\Config\Source\Allspecificcountries</source_model>
+                </field>
+                <field id="specificcountry" translate="label" type="multiselect" sortOrder="150" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Payment from Specific Countries</label>
+                    <source_model>Magento\Directory\Model\Config\Source\Country</source_model>
+                    <can_be_empty>1</can_be_empty>
+                </field>
+
+                <!-- Advanced / Environment -->
+                <field id="auth_base_url" translate="label comment" type="text" sortOrder="160" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Auth Base URL</label>
+                    <comment>Default: https://dev-auth.waffyapp.com — change to production URL when going live.</comment>
+                </field>
+                <field id="api_base_url" translate="label comment" type="text" sortOrder="170" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>API Base URL</label>
+                    <comment>Default: https://dev-api.waffyapp.com — change to production URL when going live.</comment>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>
