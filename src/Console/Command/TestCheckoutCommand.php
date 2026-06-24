@@ -80,11 +80,9 @@ class TestCheckoutCommand extends Command
             clientAdminEmail:    $clientAdminEmail,
             clientAdminPassword: $clientAdminPassword,
             customer: new CustomerInfo(
-                clientUserId: $userId,
-                phoneNumber:  $phone,
-                firstName:    'Test',
-                lastName:     'Buyer',
-                password:     hash('sha256', $userId . $clientId),
+                phoneNumber: $phone,
+                firstName:   'Test',
+                lastName:    'Buyer',
             ),
             product: new ProductInfo(
                 title:          'Test Order #SDK-001',
@@ -127,9 +125,11 @@ class TestCheckoutCommand extends Command
 
             // ── Step 2: sign up ──────────────────────────────────────────────
             $output->writeln('<comment>Step 2: Customer Sign-Up...</comment>');
+            $derivedClientUserId = $request->customer->clientUserId ?? ltrim($request->customer->phoneNumber, '+');
+            $output->writeln('  clientUserId  : ' . $derivedClientUserId);
             $clientUserToken = $this->callStep($orchestrator, 'signUpCustomer', [
                 $appToken,
-                $request->customer->clientUserId,
+                $derivedClientUserId,
                 $request->customer->phoneNumber,
                 $request->customer->firstName,
                 $request->customer->lastName,

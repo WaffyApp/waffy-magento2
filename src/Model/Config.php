@@ -56,6 +56,12 @@ class Config
         return (string) $this->getValue('merchant_phone', $storeId);
     }
 
+    /** E.164 phone number for the BROKER party. Empty string means no broker. */
+    public function getBrokerPhone(?int $storeId = null): string
+    {
+        return (string) $this->getValue('broker_phone', $storeId);
+    }
+
     public function getClientAdminEmail(?int $storeId = null): string
     {
         return (string) $this->getValue('client_admin_email', $storeId);

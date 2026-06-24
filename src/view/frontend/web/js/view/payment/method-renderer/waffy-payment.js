@@ -6,7 +6,8 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'Waffy_Payment/payment/waffy-payment'
+            template: 'Waffy_Payment/payment/waffy-payment',
+            redirectAfterPlaceOrder: false
         },
 
         getCode: function () {

@@ -47,6 +47,13 @@ class Start implements HttpGetActionInterface
 
         try {
             $request = $this->buildCheckoutRequest($order);
+
+            $this->logger->info('Waffy checkout starting', [
+                'order'        => $order->getIncrementId(),
+                'clientUserId' => $request->customer->clientUserId,
+                'phone'        => $request->customer->phoneNumber,
+            ]);
+
             $result  = $this->orchestratorFactory->create((int) $order->getStoreId())->initiateCheckout($request);
 
             $finalUrl = $result->paymentUrl . '&userTokenUrl=' . urlencode($result->customerToken);
@@ -60,6 +67,7 @@ class Start implements HttpGetActionInterface
         } catch (AuthException | ApiException $e) {
             $this->logger->error('Waffy checkout failed for order #' . $order->getIncrementId(), [
                 'exception' => $e->getMessage(),
+                'previous'  => $e->getPrevious()?->getMessage(),
             ]);
             $this->messageManager->addErrorMessage(
                 __('Waffy payment could not be initiated. Please try again or choose a different payment method.'),
@@ -75,26 +83,14 @@ class Start implements HttpGetActionInterface
         $clientId     = $this->config->getClientId($storeId);
         $clientSecret = $this->config->getClientSecret($storeId);
 
-        $billing    = $order->getBillingAddress();
-        $customerEmail = $order->getCustomerEmail() ?? '';
-        // clientUserId: use Magento customer ID if logged in, otherwise sanitised email
-        $clientUserId = $order->getCustomerId()
-            ? 'mg_' . $order->getCustomerId()
-            : 'mg_guest_' . preg_replace('/[^a-z0-9]/', '_', strtolower($customerEmail));
-
+        $billing   = $order->getBillingAddress();
         $phone     = $this->normalisePhone((string) ($billing?->getTelephone() ?? ''));
         $firstName = (string) ($billing?->getFirstname() ?? $order->getCustomerFirstname() ?? 'Customer');
         $lastName  = (string) ($billing?->getLastname() ?? $order->getCustomerLastname() ?? 'Guest');
-
-        // password field is required by CustomerInfo DTO but not sent to the API (see SDK v0.1 notes)
-        $password = hash('sha256', $clientUserId . $clientId);
-
         $customer = new CustomerInfo(
-            clientUserId: $clientUserId,
-            phoneNumber:  $phone,
-            firstName:    $firstName,
-            lastName:     $lastName,
-            password:     $password,
+            phoneNumber: $phone,
+            firstName:   $firstName,
+            lastName:    $lastName,
         );
 
         // Build product info from order items
@@ -121,13 +117,18 @@ class Start implements HttpGetActionInterface
             currency: 'SAR',
         );
 
-        $orderTotal      = (float) $order->getGrandTotal();
-        $merchantPhone   = $this->config->getMerchantPhone($storeId);
+        $orderTotal    = (float) $order->getGrandTotal();
+        $merchantPhone = $this->config->getMerchantPhone($storeId);
+        $brokerPhone   = $this->config->getBrokerPhone($storeId);
 
         $parties = [
-            new Party(phoneNumber: $phone,          role: 'CUSTOMER', amount: $orderTotal),
-            new Party(phoneNumber: $merchantPhone,  role: 'PROVIDER', amount: $orderTotal, isSender: true),
+            new Party(phoneNumber: $phone,         role: 'CUSTOMER', amount: $orderTotal),
+            new Party(phoneNumber: $merchantPhone, role: 'PROVIDER', amount: $orderTotal, isSender: true),
         ];
+
+        if ($brokerPhone !== '') {
+            $parties[] = new Party(phoneNumber: $brokerPhone, role: 'BROKER', amount: 0.0, arbitrator: true);
+        }
 
         $returnUrl = $order->getStore()->getBaseUrl()
             . 'waffy/checkout/return?order_id=' . $order->getIncrementId();

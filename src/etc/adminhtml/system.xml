@@ -37,6 +37,10 @@
                     <comment>E.164 format, e.g. +966555555555. Used as the PROVIDER party in every contract.</comment>
                     <validate>required-entry</validate>
                 </field>
+                <field id="broker_phone" translate="label comment" type="text" sortOrder="52" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Broker Phone Number</label>
+                    <comment>E.164 format, e.g. +966559555559. Leave empty if no broker party is needed.</comment>
+                </field>
                 <field id="client_admin_email" translate="label comment" type="text" sortOrder="55" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Client Admin Email</label>
                     <comment>Waffy admin account email provided to your merchant account.</comment>
