@@ -6,9 +6,6 @@
             <group id="waffy_payment" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Waffy Escrow Payment</label>
                 <comment>Contact Waffy Support Team at support@waffyapp.com to obtain your Client ID and Client Secret.</comment>
-                <fieldset_css>complex</fieldset_css>
-                <frontend_model>Magento\Paypal\Block\Adminhtml\System\Config\Fieldset\Payment</frontend_model>
-
                 <!-- Enable / Title -->
                 <field id="active" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Enabled</label>
