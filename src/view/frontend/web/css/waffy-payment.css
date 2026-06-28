@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@600&display=swap');
+
+.waffy-btn,
+.waffy-btn:visited,
+.waffy-btn:focus {
+    background-color: #0D44AD !important;
+    color: #ffffff !important;
+    border: 0 !important;
+    border-radius: 0.5rem !important;
+    height: 2.75rem !important;
+    padding: 0 2.5rem !important;
+    font-family: 'Rubik', sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    appearance: none !important;
+    outline: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-decoration: none !important;
+    transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms !important;
+}
+
+.waffy-btn:hover {
+    background-color: #3972dc !important;
+}
+
+.waffy-btn.disabled,
+.waffy-btn:disabled {
+    background-color: #1169e5 !important;
+    cursor: not-allowed !important;
+}
