@@ -11,38 +11,40 @@ use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
-use Magento\Sales\Model\OrderFactory;
+use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Psr\Log\LoggerInterface;
 
 /**
- * POST /waffy/webhook/index
+ * POST /waffy/webhook
  *
- * Receives payment status updates from Waffy and updates the Magento order status.
+ * Receives contract status updates from Waffy and syncs the Magento order.
  *
- * Waffy calls this endpoint twice per payment:
- *   - On success: { "status": "SUCCESS", "milestoneId": "...", "contractId": "...", "orderId": "..." }
- *   - On failure: { "status": "FAILURE", "milestoneId": "...", "contractId": "...", "orderId": "..." }
+ * Payload: { "contractId": "<milestoneId>", "status": "PAID|CASHOUT_IN_PROGRESS|COMPLETED|CREATED", "referenceId": "..." }
+ * The "contractId" field in the Waffy webhook is actually the milestone ID stored in ext_order_id during checkout.
  *
- * The exact payload shape is TBD (see project-docs/04-open-questions.md).
- * TODO: implement webhook signature verification using Waffy\Ecommerce\Security\WebhookVerifier
- *       once Waffy backend confirms the signing key format (open question #5).
+ * Status → Magento order transition:
+ *   CREATED             → comment only (order already pending)
+ *   PAID                → processing  (payment secured in escrow)
+ *   CASHOUT_IN_PROGRESS → comment only (keep processing)
+ *   COMPLETED           → comment only (escrow released; merchant fulfils)
  *
- * URL to register in Waffy: https://your-store.com/waffy/webhook/index
+ * TODO: add signature verification once Waffy confirms the signing key format.
+ *       See project-docs/04-open-questions.md.
  */
 class Index implements HttpPostActionInterface, CsrfAwareActionInterface
 {
     public function __construct(
         private readonly RequestInterface $request,
         private readonly JsonFactory $jsonFactory,
-        private readonly OrderFactory $orderFactory,
+        private readonly OrderCollectionFactory $orderCollectionFactory,
         private readonly OrderRepositoryInterface $orderRepository,
         private readonly LoggerInterface $logger,
     ) {}
 
     public function execute(): \Magento\Framework\Controller\ResultInterface
     {
-        $json   = $this->jsonFactory->create();
-        $body   = (string) $this->request->getContent();
+        $json    = $this->jsonFactory->create();
+        $body    = (string) $this->request->getContent();
         $payload = json_decode($body, true);
 
         if (!is_array($payload)) {
@@ -52,65 +54,93 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
 
         $this->logger->info('Waffy webhook received.', ['payload' => $payload]);
 
-        // TODO: verify webhook signature (open question #5 in project-docs/04-open-questions.md)
+        // Waffy webhooks are unsigned (confirmed 2026-06-28 via live capture).
+        // No signature verification needed.
 
-        $status    = strtoupper((string) ($payload['status'] ?? ''));
-        $incrementId = (string) ($payload['orderId'] ?? '');
+        $contractId  = (string) ($payload['contractId'] ?? '');
+        $status      = strtoupper((string) ($payload['status'] ?? ''));
+        $referenceId = (string) ($payload['referenceId'] ?? '');
 
-        if ($incrementId === '') {
-            $this->logger->warning('Waffy webhook: missing orderId in payload.');
-            return $json->setHttpResponseCode(422)->setData(['error' => 'Missing orderId']);
+        if ($contractId === '') {
+            $this->logger->warning('Waffy webhook: missing contractId in payload.');
+            return $json->setHttpResponseCode(422)->setData(['error' => 'Missing contractId']);
         }
 
-        $order = $this->orderFactory->create()->loadByIncrementId($incrementId);
-        if (!$order->getId()) {
-            $this->logger->warning('Waffy webhook: order not found.', ['orderId' => $incrementId]);
-            return $json->setHttpResponseCode(404)->setData(['error' => 'Order not found']);
+        // contractId in the Waffy webhook = milestoneId stored in ext_order_id at checkout
+        $order = $this->findOrderByMilestoneId($contractId);
+        if ($order === null) {
+            $this->logger->warning('Waffy webhook: no order found for contractId.', ['contractId' => $contractId]);
+            // Return 200 so Waffy does not keep retrying for IDs we don't recognise
+            return $json->setData(['received' => true]);
         }
 
-        match ($status) {
-            'SUCCESS' => $this->handleSuccess($order, $payload),
-            'FAILURE' => $this->handleFailure($order, $payload),
-            default   => $this->logger->warning('Waffy webhook: unknown status.', ['status' => $status]),
-        };
+        $this->handleStatus($order, $status, $contractId, $referenceId);
 
         return $json->setData(['received' => true]);
     }
 
-    private function handleSuccess(Order $order, array $payload): void
+    private function findOrderByMilestoneId(string $milestoneId): ?Order
     {
-        if ($order->getState() === Order::STATE_PROCESSING) {
-            return; // already handled
-        }
+        $collection = $this->orderCollectionFactory->create()
+            ->addFieldToFilter('ext_order_id', ['eq' => $milestoneId])
+            ->setPageSize(1);
 
-        $order->setState(Order::STATE_PROCESSING)
-              ->setStatus('processing');
-        $order->addCommentToStatusHistory(
-            __('Waffy payment confirmed. Contract: %1, Milestone: %2',
-                $payload['contractId'] ?? 'n/a',
-                $payload['milestoneId'] ?? 'n/a'),
-        );
-        $this->orderRepository->save($order);
-
-        $this->logger->info('Waffy webhook: order #' . $order->getIncrementId() . ' → processing.');
+        /** @var Order $order */
+        $order = $collection->getFirstItem();
+        return $order->getId() ? $order : null;
     }
 
-    private function handleFailure(Order $order, array $payload): void
+    private function handleStatus(Order $order, string $status, string $contractId, string $referenceId): void
     {
-        if ($order->getState() === Order::STATE_CANCELED) {
-            return; // already handled
+        $ref = $referenceId !== '' ? ' (ref: ' . $referenceId . ')' : '';
+
+        match ($status) {
+            'CREATED' => $this->addComment(
+                $order,
+                'Waffy: contract created' . $ref . '.',
+            ),
+            'PAYMENT_PROCESSING' => $this->addComment(
+                $order,
+                'Waffy: payment is being processed' . $ref . '.',
+            ),
+            'PAID' => $this->transitionTo(
+                $order,
+                Order::STATE_PROCESSING,
+                'processing',
+                'Waffy: payment secured in escrow. Milestone: ' . $contractId . $ref,
+            ),
+            'ACCEPTED' => $this->addComment(
+                $order,
+                'Waffy: payment accepted, contract awaiting settlement' . $ref . '.',
+            ),
+            'CASHOUT_IN_PROGRESS' => $this->addComment(
+                $order,
+                'Waffy: funds release in progress' . $ref . '.',
+            ),
+            'COMPLETED' => $this->addComment(
+                $order,
+                'Waffy: escrow completed, funds released to merchant' . $ref . '.',
+            ),
+            default => $this->logger->warning('Waffy webhook: unknown status.', ['status' => $status]),
+        };
+    }
+
+    private function transitionTo(Order $order, string $state, string $status, string $comment): void
+    {
+        if ($order->getState() === $state) {
+            return; // idempotent — already in this state
         }
-
-        $order->setState(Order::STATE_CANCELED)
-              ->setStatus('canceled');
-        $order->addCommentToStatusHistory(
-            __('Waffy payment failed or was rejected. Contract: %1, Milestone: %2',
-                $payload['contractId'] ?? 'n/a',
-                $payload['milestoneId'] ?? 'n/a'),
-        );
+        $order->setState($state)->setStatus($status);
+        $order->addCommentToStatusHistory($comment);
         $this->orderRepository->save($order);
+        $this->logger->info('Waffy webhook: order #' . $order->getIncrementId() . ' → ' . $state . '.');
+    }
 
-        $this->logger->info('Waffy webhook: order #' . $order->getIncrementId() . ' → canceled.');
+    private function addComment(Order $order, string $comment): void
+    {
+        $order->addCommentToStatusHistory($comment);
+        $this->orderRepository->save($order);
+        $this->logger->info('Waffy webhook: comment added to order #' . $order->getIncrementId() . '.');
     }
 
     // ── CsrfAwareActionInterface ─────────────────────────────────────────────

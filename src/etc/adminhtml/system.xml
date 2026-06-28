@@ -6,6 +6,14 @@
             <group id="waffy_payment" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Waffy Escrow Payment</label>
                 <comment>Contact Waffy Support Team at support@waffyapp.com to obtain your Client ID and Client Secret.</comment>
+
+                <!-- Webhook URL — copy and share with Waffy team to register this store -->
+                <field id="webhook_url" translate="label comment" type="label" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Webhook URL</label>
+                    <comment><![CDATA[Copy this URL and share it with the Waffy team to register your store's webhook endpoint.]]></comment>
+                    <frontend_model>Waffy\Payment\Block\Adminhtml\System\Config\WebhookUrl</frontend_model>
+                </field>
+
                 <!-- Enable / Title -->
                 <field id="active" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Enabled</label>

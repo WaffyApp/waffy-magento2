@@ -8,6 +8,7 @@ use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\Controller\Result\RedirectFactory;
 use Magento\Framework\Message\ManagerInterface;
+use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Psr\Log\LoggerInterface;
 use Waffy\Ecommerce\Dto\CheckoutRequest;
@@ -34,6 +35,7 @@ class Start implements HttpGetActionInterface
         private readonly ManagerInterface $messageManager,
         private readonly Config $config,
         private readonly OrchestratorFactory $orchestratorFactory,
+        private readonly OrderRepositoryInterface $orderRepository,
         private readonly LoggerInterface $logger,
     ) {}
 
@@ -55,6 +57,10 @@ class Start implements HttpGetActionInterface
             ]);
 
             $result  = $this->orchestratorFactory->create((int) $order->getStoreId())->initiateCheckout($request);
+
+            // Store the milestone ID so the webhook can look up this order by contractId.
+            $order->setExtOrderId($result->milestoneId);
+            $this->orderRepository->save($order);
 
             $finalUrl = $result->paymentUrl . '&userTokenUrl=' . urlencode($result->customerToken);
 
