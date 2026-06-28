@@ -97,48 +97,65 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         match ($status) {
             'CREATED' => $this->addComment(
                 $order,
-                'Waffy: contract created' . $ref . '.',
+                adminComment: 'Waffy: contract created' . $ref . '.',
             ),
             'PAYMENT_PROCESSING' => $this->addComment(
                 $order,
-                'Waffy: payment is being processed' . $ref . '.',
+                adminComment:    'Waffy: payment is being processed' . $ref . '.',
+                customerComment: 'Your payment is being processed.',
             ),
             'PAID' => $this->transitionTo(
                 $order,
-                Order::STATE_PROCESSING,
-                'processing',
-                'Waffy: payment secured in escrow. Milestone: ' . $contractId . $ref,
+                state:           Order::STATE_PROCESSING,
+                status:          'processing',
+                adminComment:    'Waffy: payment secured in escrow. Milestone: ' . $contractId . $ref,
+                customerComment: 'Your payment has been received and secured.',
             ),
             'ACCEPTED' => $this->addComment(
                 $order,
-                'Waffy: payment accepted, contract awaiting settlement' . $ref . '.',
+                adminComment:    'Waffy: payment accepted, contract awaiting settlement' . $ref . '.',
+                customerComment: 'Your payment has been confirmed.',
             ),
             'CASHOUT_IN_PROGRESS' => $this->addComment(
                 $order,
-                'Waffy: funds release in progress' . $ref . '.',
+                adminComment: 'Waffy: funds release in progress' . $ref . '.',
             ),
             'COMPLETED' => $this->addComment(
                 $order,
-                'Waffy: escrow completed, funds released to merchant' . $ref . '.',
+                adminComment:    'Waffy: escrow completed, funds released to merchant' . $ref . '.',
+                customerComment: 'Your order has been completed.',
             ),
             default => $this->logger->warning('Waffy webhook: unknown status.', ['status' => $status]),
         };
     }
 
-    private function transitionTo(Order $order, string $state, string $status, string $comment): void
-    {
-        if ($order->getState() === $state) {
-            return; // idempotent — already in this state
+    private function transitionTo(
+        Order $order,
+        string $state,
+        string $status,
+        string $adminComment,
+        string $customerComment = '',
+    ): void {
+        if ($order->getState() !== $state) {
+            $order->setState($state)->setStatus($status);
         }
-        $order->setState($state)->setStatus($status);
-        $order->addCommentToStatusHistory($comment);
+        $order->addCommentToStatusHistory($adminComment, false, false);
+        if ($customerComment !== '') {
+            $order->addCommentToStatusHistory($customerComment, false, true);
+        }
         $this->orderRepository->save($order);
         $this->logger->info('Waffy webhook: order #' . $order->getIncrementId() . ' → ' . $state . '.');
     }
 
-    private function addComment(Order $order, string $comment): void
-    {
-        $order->addCommentToStatusHistory($comment);
+    private function addComment(
+        Order $order,
+        string $adminComment,
+        string $customerComment = '',
+    ): void {
+        $order->addCommentToStatusHistory($adminComment, false, false);
+        if ($customerComment !== '') {
+            $order->addCommentToStatusHistory($customerComment, false, true);
+        }
         $this->orderRepository->save($order);
         $this->logger->info('Waffy webhook: comment added to order #' . $order->getIncrementId() . '.');
     }

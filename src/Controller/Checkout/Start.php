@@ -106,7 +106,7 @@ class Start implements HttpGetActionInterface
             $itemNames[] = $item->getName() . ' x' . (int) $item->getQtyOrdered();
         }
         $product = new ProductInfo(
-            title:           'Order #' . $order->getIncrementId(),
+            title:           $order->getStore()->getName() . ' - Order #' . $order->getIncrementId(),
             description:     implode(', ', $itemNames),
             images:          $itemImages,
             category:        $this->config->getCategory($storeId),
