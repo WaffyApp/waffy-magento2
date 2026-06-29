@@ -58,7 +58,9 @@ class Start implements HttpGetActionInterface
 
             $result  = $this->orchestratorFactory->create((int) $order->getStoreId())->initiateCheckout($request);
 
-            // Store the milestone ID so the webhook can look up this order by contractId.
+            // Mark as pending_payment and store the milestone ID before redirecting.
+            $order->setState(Order::STATE_PENDING_PAYMENT)
+                  ->setStatus('pending_payment');
             $order->setExtOrderId($result->milestoneId);
             $this->orderRepository->save($order);
 
