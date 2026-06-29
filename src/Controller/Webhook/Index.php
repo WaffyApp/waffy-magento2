@@ -111,14 +111,17 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
                 adminComment:    'Waffy: payment secured in escrow. Milestone: ' . $contractId . $ref,
                 customerComment: 'Your payment has been received and secured.',
             ),
-            'ACCEPTED' => $this->addComment(
+            'ACCEPTED' => $this->transitionTo(
                 $order,
-                adminComment:    'Waffy: payment accepted, contract awaiting settlement' . $ref . '.',
+                state: Order::STATE_PROCESSING,
+                status: 'processing',
+                adminComment: 'Waffy: payment accepted, contract awaiting settlement' . $ref . '.',
                 customerComment: 'Your payment has been confirmed.',
             ),
             'CASHOUT_IN_PROGRESS' => $this->addComment(
                 $order,
                 adminComment: 'Waffy: funds release in progress' . $ref . '.',
+                customerComment: 'Your funds are being released.',
             ),
             'COMPLETED' => $this->addComment(
                 $order,

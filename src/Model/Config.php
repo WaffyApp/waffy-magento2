@@ -129,6 +129,19 @@ class Config
         return (string) $this->getValue('payment_type', $storeId) ?: 'PURCHASE';
     }
 
+    /**
+     * Store business name from Admin → Stores → Configuration → General → Store Information → Store Name.
+     * Set it there — it appears as the contract title on the Waffy payment page.
+     */
+    public function getStoreName(?int $storeId = null): string
+    {
+        return (string) $this->scopeConfig->getValue(
+            'general/store_information/name',
+            ScopeInterface::SCOPE_STORE,
+            $storeId,
+        ) ?: 'Store';
+    }
+
     public function getAuthBaseUrl(?int $storeId = null): string
     {
         return rtrim((string) $this->getValue('auth_base_url', $storeId), '/') ?: 'https://dev-auth.waffyapp.com';
