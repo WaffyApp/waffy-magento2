@@ -27,17 +27,61 @@
                     <label>Title</label>
                 </field>
 
-                <!-- API Credentials -->
-                <field id="client_id" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Client ID</label>
-                    <comment>Provided by Waffy. Contact support@waffyapp.com to get yours.</comment>
-                    <validate>required-entry</validate>
+                <!-- Environment -->
+                <field id="environment" translate="label comment" type="select" sortOrder="25" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Environment</label>
+                    <comment><![CDATA[<strong>Sandbox</strong> for testing (no real money), <strong>Production</strong> to go live. Each environment has its own credentials below.]]></comment>
+                    <source_model>Waffy\Payment\Model\Config\Source\Environment</source_model>
                 </field>
-                <field id="client_secret" translate="label comment" type="obscure" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Client Secret</label>
+
+                <!-- Sandbox credentials -->
+                <field id="sandbox_client_id" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Sandbox Client ID</label>
+                    <comment>Provided by Waffy. Contact support@waffyapp.com to get yours.</comment>
+                    <depends><field id="environment">sandbox</field></depends>
+                </field>
+                <field id="sandbox_client_secret" translate="label comment" type="obscure" sortOrder="31" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Sandbox Client Secret</label>
                     <comment>Stored encrypted. Never share this value.</comment>
                     <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
-                    <validate>required-entry</validate>
+                    <depends><field id="environment">sandbox</field></depends>
+                </field>
+                <field id="sandbox_client_admin_email" translate="label comment" type="text" sortOrder="32" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Sandbox Client Admin Email</label>
+                    <comment>Waffy admin account email for your sandbox merchant account.</comment>
+                    <validate>validate-email</validate>
+                    <depends><field id="environment">sandbox</field></depends>
+                </field>
+                <field id="sandbox_client_admin_password" translate="label comment" type="obscure" sortOrder="33" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Sandbox Client Admin Password</label>
+                    <comment>Stored encrypted.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <depends><field id="environment">sandbox</field></depends>
+                </field>
+
+                <!-- Production credentials -->
+                <field id="production_client_id" translate="label comment" type="text" sortOrder="34" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Production Client ID</label>
+                    <comment>Provided by Waffy. Contact support@waffyapp.com to get yours.</comment>
+                    <depends><field id="environment">production</field></depends>
+                </field>
+                <field id="production_client_secret" translate="label comment" type="obscure" sortOrder="35" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Production Client Secret</label>
+                    <comment>Stored encrypted. Never share this value.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <depends><field id="environment">production</field></depends>
+                </field>
+                <field id="production_client_admin_email" translate="label comment" type="text" sortOrder="36" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Production Client Admin Email</label>
+                    <comment>Waffy admin account email for your production merchant account.</comment>
+                    <validate>validate-email</validate>
+                    <depends><field id="environment">production</field></depends>
+                </field>
+                <field id="production_client_admin_password" translate="label comment" type="obscure" sortOrder="37" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Production Client Admin Password</label>
+                    <comment>Stored encrypted.</comment>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <depends><field id="environment">production</field></depends>
                 </field>
 
                 <!-- Merchant identity -->
@@ -50,18 +94,6 @@
                     <label>Broker Phone Number</label>
                     <comment>E.164 format, e.g. +966559555559. Leave empty if no broker party is needed.</comment>
                 </field>
-                <field id="client_admin_email" translate="label comment" type="text" sortOrder="55" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Client Admin Email</label>
-                    <comment>Waffy admin account email provided to your merchant account.</comment>
-                    <validate>required-entry validate-email</validate>
-                </field>
-                <field id="client_admin_password" translate="label comment" type="obscure" sortOrder="56" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Client Admin Password</label>
-                    <comment>Stored encrypted. Used for merchant-level admin operations.</comment>
-                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
-                    <validate>required-entry</validate>
-                </field>
-
                 <!-- Contract settings -->
                 <field id="return_policy" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Return Policy</label>
@@ -111,14 +143,14 @@
                     <can_be_empty>1</can_be_empty>
                 </field>
 
-                <!-- Advanced / Environment -->
+                <!-- Advanced: URL overrides (normally derived from Environment) -->
                 <field id="auth_base_url" translate="label comment" type="text" sortOrder="160" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Auth Base URL</label>
-                    <comment>Default: https://dev-auth.waffyapp.com — change to production URL when going live.</comment>
+                    <label>Auth Base URL Override</label>
+                    <comment><![CDATA[<strong>Leave empty</strong> — the URL is set automatically by the Environment selection. Fill only to point at a custom/staging server.]]></comment>
                 </field>
                 <field id="api_base_url" translate="label comment" type="text" sortOrder="170" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>API Base URL</label>
-                    <comment>Default: https://dev-api.waffyapp.com — change to production URL when going live.</comment>
+                    <label>API Base URL Override</label>
+                    <comment><![CDATA[<strong>Leave empty</strong> — the URL is set automatically by the Environment selection. Fill only to point at a custom/staging server.]]></comment>
                 </field>
             </group>
         </section>

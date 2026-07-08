@@ -9,8 +9,11 @@
                 <model>Waffy\Payment\Model\Payment</model>
                 <order_status>pending_payment</order_status>
                 <allowspecific>0</allowspecific>
-                <client_id></client_id>
-                <client_secret></client_secret>
+                <environment>sandbox</environment>
+                <sandbox_client_id></sandbox_client_id>
+                <sandbox_client_secret></sandbox_client_secret>
+                <production_client_id></production_client_id>
+                <production_client_secret></production_client_secret>
                 <merchant_phone></merchant_phone>
                 <return_policy>NO_RETURN</return_policy>
                 <return_fee_payee>PROVIDER</return_fee_payee>
@@ -20,8 +23,8 @@
                 <milestone_deadline_days>30</milestone_deadline_days>
                 <category>Services</category>
                 <payment_type>PURCHASE</payment_type>
-                <auth_base_url>https://dev-auth.waffyapp.com</auth_base_url>
-                <api_base_url>https://dev-api.waffyapp.com</api_base_url>
+                <!-- auth_base_url / api_base_url intentionally have no defaults:
+                     empty means "derive from environment" (see Model\Config). -->
             </waffy_payment>
         </payment>
     </default>

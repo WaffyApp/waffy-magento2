@@ -16,6 +16,14 @@ class Config
 {
     private const PATH = 'payment/waffy_payment/';
 
+    private const SANDBOX_AUTH_URL = 'https://dev-auth.waffyapp.com';
+    private const SANDBOX_API_URL  = 'https://dev-api.waffyapp.com';
+
+    // TODO(TBD): confirm production URLs with the backend team.
+    // See project-docs/04-open-questions.md.
+    private const PRODUCTION_AUTH_URL = 'https://auth.waffyapp.com';
+    private const PRODUCTION_API_URL  = 'https://api.waffyapp.com';
+
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly EncryptorInterface $encryptor,
@@ -35,15 +43,26 @@ class Config
         return (string) $this->getValue('title', $storeId);
     }
 
+    /** 'sandbox' or 'production'. Defaults to sandbox — going live is an explicit act. */
+    public function getEnvironment(?int $storeId = null): string
+    {
+        return (string) $this->getValue('environment', $storeId) ?: 'sandbox';
+    }
+
+    public function isSandbox(?int $storeId = null): bool
+    {
+        return $this->getEnvironment($storeId) !== 'production';
+    }
+
     public function getClientId(?int $storeId = null): string
     {
-        return (string) $this->getValue('client_id', $storeId);
+        return (string) $this->getEnvValue('client_id', $storeId);
     }
 
     /** Returns the decrypted client secret. */
     public function getClientSecret(?int $storeId = null): string
     {
-        $encrypted = (string) $this->getValue('client_secret', $storeId);
+        $encrypted = (string) $this->getEnvValue('client_secret', $storeId);
         if ($encrypted === '') {
             return '';
         }
@@ -64,13 +83,13 @@ class Config
 
     public function getClientAdminEmail(?int $storeId = null): string
     {
-        return (string) $this->getValue('client_admin_email', $storeId);
+        return (string) $this->getEnvValue('client_admin_email', $storeId);
     }
 
     /** Returns the decrypted client admin password. */
     public function getClientAdminPassword(?int $storeId = null): string
     {
-        $encrypted = (string) $this->getValue('client_admin_password', $storeId);
+        $encrypted = (string) $this->getEnvValue('client_admin_password', $storeId);
         if ($encrypted === '') {
             return '';
         }
@@ -158,14 +177,18 @@ class Config
         )));
     }
 
+    /** Environment-derived URL; an explicit override in config wins. */
     public function getAuthBaseUrl(?int $storeId = null): string
     {
-        return rtrim((string) $this->getValue('auth_base_url', $storeId), '/') ?: 'https://dev-auth.waffyapp.com';
+        return rtrim((string) $this->getValue('auth_base_url', $storeId), '/')
+            ?: ($this->isSandbox($storeId) ? self::SANDBOX_AUTH_URL : self::PRODUCTION_AUTH_URL);
     }
 
+    /** Environment-derived URL; an explicit override in config wins. */
     public function getApiBaseUrl(?int $storeId = null): string
     {
-        return rtrim((string) $this->getValue('api_base_url', $storeId), '/') ?: 'https://dev-api.waffyapp.com';
+        return rtrim((string) $this->getValue('api_base_url', $storeId), '/')
+            ?: ($this->isSandbox($storeId) ? self::SANDBOX_API_URL : self::PRODUCTION_API_URL);
     }
 
     private function getValue(string $field, ?int $storeId): mixed
@@ -175,5 +198,11 @@ class Config
             ScopeInterface::SCOPE_STORE,
             $storeId,
         );
+    }
+
+    /** Reads the field belonging to the active environment (sandbox_* / production_*). */
+    private function getEnvValue(string $field, ?int $storeId): mixed
+    {
+        return $this->getValue($this->getEnvironment($storeId) . '_' . $field, $storeId);
     }
 }
