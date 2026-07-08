@@ -2,7 +2,7 @@
     "name": "waffy/module-payment",
     "description": "Waffy escrow payment integration for Magento 2 / Mage-OS",
     "type": "magento2-module",
-    "version": "1.0.0",
+    "version": "0.5.0",
     "license": "proprietary",
     "keywords": ["waffy", "escrow", "payment", "magento2", "mage-os"],
     "homepage": "https://github.com/WaffyApp/waffy-magento2",
