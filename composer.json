@@ -3,20 +3,25 @@
     "description": "Waffy escrow payment integration for Magento 2 / Mage-OS",
     "type": "magento2-module",
     "version": "0.5.0",
-    "license": "proprietary",
+    "license": "OSL-3.0",
     "keywords": ["waffy", "escrow", "payment", "magento2", "mage-os"],
     "homepage": "https://github.com/WaffyApp/waffy-magento2",
     "require": {
         "php": "^8.1",
+        "ext-json": "*",
+        "ext-openssl": "*",
         "magento/framework": ">=103.0",
-        "waffy/ecommerce-sdk": "^0.1"
+        "guzzlehttp/guzzle": "^7.8",
+        "psr/log": "^3.0",
+        "ramsey/uuid": "^4.7"
     },
     "autoload": {
         "files": [
             "registration.php"
         ],
         "psr-4": {
-            "Waffy\\Payment\\": ""
+            "Waffy\\Payment\\": "",
+            "Waffy\\Ecommerce\\": "Sdk/"
         }
     },
     "config": {
