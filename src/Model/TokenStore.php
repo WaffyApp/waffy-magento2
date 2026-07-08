@@ -11,8 +11,8 @@ use Waffy\Ecommerce\Contract\TokenStore as TokenStoreInterface;
 /**
  * Persists OAuth tokens in the waffy_token table (AES-256 encrypted).
  *
- * merchant tokens: keyed by clientId
- * customer tokens: keyed by clientUserId
+ * app/merchant tokens: keyed by clientId
+ * customer tokens:     keyed by clientUserId
  */
 class TokenStore implements TokenStoreInterface
 {
@@ -23,12 +23,22 @@ class TokenStore implements TokenStoreInterface
         private readonly EncryptorInterface $encryptor,
     ) {}
 
-    public function storeUserToken(string $clientId, string $token): void
+    public function storeAppToken(string $clientId, string $token): void
+    {
+        $this->upsert('app', $clientId, $token);
+    }
+
+    public function getAppToken(string $clientId): ?string
+    {
+        return $this->fetch('app', $clientId);
+    }
+
+    public function storeMerchantToken(string $clientId, string $token): void
     {
         $this->upsert('merchant', $clientId, $token);
     }
 
-    public function getUserToken(string $clientId): ?string
+    public function getMerchantToken(string $clientId): ?string
     {
         return $this->fetch('merchant', $clientId);
     }

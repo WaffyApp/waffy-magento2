@@ -5,8 +5,8 @@
     <!-- Stores merchant and customer OAuth tokens (encrypted). -->
     <table name="waffy_token" resource="default" engine="innodb" comment="Waffy OAuth Token Cache">
         <column xsi:type="int" name="token_id" unsigned="true" nullable="false" identity="true" comment="Token ID"/>
-        <!-- 'merchant' or 'customer' -->
-        <column xsi:type="varchar" name="entity_type" nullable="false" length="16" comment="Token scope: merchant or customer"/>
+        <!-- 'app', 'merchant', or 'customer' -->
+        <column xsi:type="varchar" name="entity_type" nullable="false" length="16" comment="Token scope: app, merchant, or customer"/>
         <!-- clientId (merchant) or clientUserId (customer) -->
         <column xsi:type="varchar" name="entity_id" nullable="false" length="255" comment="Scope-specific identifier"/>
         <!-- AES-256 encrypted via Magento EncryptorInterface -->
