@@ -36,6 +36,13 @@ class ReturnAction implements HttpGetActionInterface
     {
         $incrementId = (string) $this->request->getParam('order_id', '');
 
+        // Waffy appends "?status=..." to the redirect URL even when it already
+        // has a query string, corrupting order_id to "000000052?status=undefined".
+        // Strip anything from the first "?" onward. (Reported to Waffy team.)
+        if (($pos = strpos($incrementId, '?')) !== false) {
+            $incrementId = substr($incrementId, 0, $pos);
+        }
+
         if ($incrementId === '') {
             return $this->redirectFactory->create()->setPath('checkout/cart');
         }
