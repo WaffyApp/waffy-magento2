@@ -9,10 +9,12 @@ use Magento\Framework\App\CsrfAwareActionInterface;
 use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Psr\Log\LoggerInterface;
+use Waffy\Payment\Model\Config;
 
 /**
  * POST /waffy/webhook
@@ -28,8 +30,9 @@ use Psr\Log\LoggerInterface;
  *   CASHOUT_IN_PROGRESS → comment only (keep processing)
  *   COMPLETED           → comment only (escrow released; merchant fulfils)
  *
- * TODO: add signature verification once Waffy confirms the signing key format.
- *       See project-docs/04-open-questions.md.
+ * Access control: optional IP allowlist (payment/waffy_payment/webhook_allowed_ips).
+ * Waffy webhooks are unsigned (confirmed 2026-06-28 via live capture), so the
+ * allowlist is the only request-origin check available.
  */
 class Index implements HttpPostActionInterface, CsrfAwareActionInterface
 {
@@ -38,12 +41,21 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         private readonly JsonFactory $jsonFactory,
         private readonly OrderCollectionFactory $orderCollectionFactory,
         private readonly OrderRepositoryInterface $orderRepository,
+        private readonly Config $config,
+        private readonly RemoteAddress $remoteAddress,
         private readonly LoggerInterface $logger,
     ) {}
 
     public function execute(): \Magento\Framework\Controller\ResultInterface
     {
-        $json    = $this->jsonFactory->create();
+        $json = $this->jsonFactory->create();
+
+        $clientIp = (string) $this->remoteAddress->getRemoteAddress();
+        if (!$this->isIpAllowed($clientIp)) {
+            $this->logger->warning('Waffy webhook: request blocked by IP allowlist.', ['ip' => $clientIp]);
+            return $json->setHttpResponseCode(403)->setData(['error' => 'Forbidden']);
+        }
+
         $body    = (string) $this->request->getContent();
         $payload = json_decode($body, true);
 
@@ -161,6 +173,49 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         }
         $this->orderRepository->save($order);
         $this->logger->info('Waffy webhook: comment added to order #' . $order->getIncrementId() . '.');
+    }
+
+    // ── IP allowlist ─────────────────────────────────────────────────────────
+
+    /**
+     * Empty allowlist = no restriction. Entries may be exact IPs (v4 or v6)
+     * or IPv4 CIDR ranges (e.g. 203.0.113.0/24).
+     */
+    private function isIpAllowed(string $clientIp): bool
+    {
+        $allowed = $this->config->getWebhookAllowedIps();
+        if ($allowed === []) {
+            return true;
+        }
+
+        foreach ($allowed as $entry) {
+            if ($this->ipMatches($clientIp, $entry)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function ipMatches(string $clientIp, string $entry): bool
+    {
+        if (!str_contains($entry, '/')) {
+            return $clientIp === $entry;
+        }
+
+        // IPv4 CIDR match
+        [$subnet, $bits] = explode('/', $entry, 2);
+        $ipLong     = ip2long($clientIp);
+        $subnetLong = ip2long($subnet);
+        $bits       = (int) $bits;
+
+        if ($ipLong === false || $subnetLong === false || $bits < 0 || $bits > 32) {
+            return false;
+        }
+
+        $mask = $bits === 0 ? 0 : (-1 << (32 - $bits));
+
+        return ($ipLong & $mask) === ($subnetLong & $mask);
     }
 
     // ── CsrfAwareActionInterface ─────────────────────────────────────────────

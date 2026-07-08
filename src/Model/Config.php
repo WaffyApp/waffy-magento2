@@ -142,6 +142,22 @@ class Config
         ) ?: 'Store';
     }
 
+    /**
+     * IPs/CIDR ranges allowed to call the webhook endpoint.
+     * Empty array means no restriction (allow all).
+     *
+     * @return string[]
+     */
+    public function getWebhookAllowedIps(?int $storeId = null): array
+    {
+        $raw = (string) $this->getValue('webhook_allowed_ips', $storeId);
+
+        return array_values(array_filter(array_map(
+            'trim',
+            preg_split('/[\s,]+/', $raw) ?: [],
+        )));
+    }
+
     public function getAuthBaseUrl(?int $storeId = null): string
     {
         return rtrim((string) $this->getValue('auth_base_url', $storeId), '/') ?: 'https://dev-auth.waffyapp.com';

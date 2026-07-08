@@ -13,6 +13,10 @@
                     <comment><![CDATA[Copy this URL and share it with the Waffy team to register your store's webhook endpoint.]]></comment>
                     <frontend_model>Waffy\Payment\Block\Adminhtml\System\Config\WebhookUrl</frontend_model>
                 </field>
+                <field id="webhook_allowed_ips" translate="label comment" type="textarea" sortOrder="7" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Webhook Allowed IPs</label>
+                    <comment><![CDATA[One IP or CIDR range per line (e.g. <code>203.0.113.7</code> or <code>203.0.113.0/24</code>). Requests to the webhook from other IPs get 403. <strong>Leave empty to allow all</strong> — ask the Waffy team for their server IPs before restricting.]]></comment>
+                </field>
 
                 <!-- Enable / Title -->
                 <field id="active" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
