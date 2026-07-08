@@ -1,7 +1,8 @@
 define([
     'Magento_Checkout/js/view/payment/default',
+    'Magento_Checkout/js/model/full-screen-loader',
     'mage/url'
-], function (Component, url) {
+], function (Component, fullScreenLoader, url) {
     'use strict';
 
     return Component.extend({
@@ -20,10 +21,13 @@ define([
 
         /**
          * Called by the checkout JS after the order is successfully placed.
-         * Redirects to our Start controller, which calls the Waffy SDK
-         * and forwards the buyer to the Waffy-hosted payment page.
+         * place-order.js already stopped the full-screen loader in its own
+         * .always() handler by this point, so we restart it here to keep the
+         * page blocked until the browser actually navigates to the Waffy
+         * payment page — otherwise checkout briefly becomes interactive again.
          */
         afterPlaceOrder: function () {
+            fullScreenLoader.startLoader();
             window.location.replace(url.build('waffy/checkout/start'));
         }
     });
