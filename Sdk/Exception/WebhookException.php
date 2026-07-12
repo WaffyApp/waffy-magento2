@@ -11,6 +11,6 @@ namespace Waffy\Ecommerce\Exception;
  * The platform adapter should respond with HTTP 401 / 400 on these and NOT
  * apply any side effects to the order.
  */
-final class WebhookException extends WaffyException
+class WebhookException extends WaffyException
 {
 }

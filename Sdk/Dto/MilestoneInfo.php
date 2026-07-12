@@ -18,7 +18,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  *             on-demand purchases (e.g. +30 days from now).
  * addOnFees — optional platform fees added on top of the base itemPrice.
  */
-final readonly class MilestoneInfo
+readonly class MilestoneInfo
 {
     /**
      * @param AddOnFee[] $addOnFees

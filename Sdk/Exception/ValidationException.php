@@ -11,6 +11,6 @@ namespace Waffy\Ecommerce\Exception;
  * Distinct from ApiException (which reports failures from the Waffy
  * backend); ValidationException means we caught the bad input ourselves.
  */
-final class ValidationException extends WaffyException
+class ValidationException extends WaffyException
 {
 }

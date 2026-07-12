@@ -11,7 +11,7 @@ namespace Waffy\Ecommerce\Client;
  * are exposed for callers that need them (idempotent-replay detection,
  * rate-limit reads, request-id propagation).
  */
-final readonly class ApiResponse
+readonly class ApiResponse
 {
     /**
      * @param array<string, mixed>          $data    Decoded JSON body

@@ -8,6 +8,6 @@ namespace Waffy\Ecommerce\Exception;
  * Thrown when authentication fails — invalid token, expired credentials,
  * refresh failure, or missing required auth configuration.
  */
-final class AuthException extends WaffyException
+class AuthException extends WaffyException
 {
 }

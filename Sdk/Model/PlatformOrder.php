@@ -18,7 +18,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  * Magento increment id "000000123" or WooCommerce id 456). Used for
  * idempotency scoping and for cross-referencing in webhook handlers.
  */
-final readonly class PlatformOrder
+readonly class PlatformOrder
 {
     /**
      * @param list<OrderItem> $items

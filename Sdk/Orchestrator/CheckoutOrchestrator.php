@@ -21,7 +21,7 @@ use Waffy\Ecommerce\Model\PlatformOrder;
  * "{platformId}:create-payment:{platformOrderId}" so duplicate clicks /
  * webhook retries don't create duplicate payments.
  */
-final class CheckoutOrchestrator
+class CheckoutOrchestrator
 {
     /**
      * Path on the Waffy backend that creates a payment for an external

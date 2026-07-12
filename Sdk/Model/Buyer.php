@@ -12,7 +12,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  * Waffy primarily identifies buyers by phone (KSA market — Mada / STC Pay /
  * Apple Pay all rely on phone). Email is recommended for receipts.
  */
-final readonly class Buyer
+readonly class Buyer
 {
     public function __construct(
         public string $phone,

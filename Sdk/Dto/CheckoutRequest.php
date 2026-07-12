@@ -20,7 +20,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  * redirectUrl        — where Waffy redirects the buyer after they complete payment.
  * paymentType        — always PURCHASE for standard checkout (PURCHASE | SUBSCRIPTION).
  */
-final readonly class CheckoutRequest
+readonly class CheckoutRequest
 {
     /**
      * @param Party[] $parties At minimum: one CUSTOMER and one PROVIDER.

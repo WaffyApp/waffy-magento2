@@ -14,7 +14,7 @@ use Waffy\Ecommerce\Exception\WebhookException;
  * retained as a no-op seam so signature verification can be wired in later
  * without changing callers if Waffy adds signing in a future API version.
  */
-final class SignatureVerifier
+class SignatureVerifier
 {
     public function __construct(private readonly string $signingSecret = '')
     {

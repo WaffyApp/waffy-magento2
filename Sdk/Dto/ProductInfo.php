@@ -15,7 +15,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  * returnFeePayee — PROVIDER | CUSTOMER (who pays return shipping; default: PROVIDER)
  * category       — free-text category, e.g. "Electronics", "Services", "Clothing"
  */
-final readonly class ProductInfo
+readonly class ProductInfo
 {
     /**
      * @param string[] $images Image URLs (max recommended: 5)

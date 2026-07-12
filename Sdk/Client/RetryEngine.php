@@ -25,7 +25,7 @@ use Throwable;
  *   Attempt 2: rand(0, min(100 * 2^0, 2000)) = 0–100ms
  *   Attempt 3: rand(0, min(100 * 2^1, 2000)) = 0–200ms
  */
-final class RetryEngine
+class RetryEngine
 {
     public function __construct(
         private readonly int $maxAttempts = 3,

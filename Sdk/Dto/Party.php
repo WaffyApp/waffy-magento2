@@ -14,7 +14,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  * isSender    — true when this party initiates the payment (usually the PROVIDER).
  * arbitrator  — true when this BROKER can adjudicate disputes.
  */
-final readonly class Party
+readonly class Party
 {
     private const VALID_ROLES = ['CUSTOMER', 'PROVIDER', 'BROKER'];
 

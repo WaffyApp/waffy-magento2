@@ -15,7 +15,7 @@ namespace Waffy\Ecommerce\Model;
  * or failure Waffy returns the buyer to the platform's return URL with a
  * status query param (see WaffyPaymentWebView pattern in the RN SDK).
  */
-final readonly class PaymentSession
+readonly class PaymentSession
 {
     public function __construct(
         public string $contractId,

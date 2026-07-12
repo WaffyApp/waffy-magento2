@@ -11,7 +11,7 @@ namespace Waffy\Ecommerce\Model;
  * Used by SettlementTracker and webhook handlers when the SDK needs to
  * inspect the current state of a contract returned by the Waffy backend.
  */
-final readonly class Contract
+readonly class Contract
 {
     public function __construct(
         public string $contractId,

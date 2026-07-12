@@ -16,7 +16,7 @@ use Waffy\Ecommerce\Exception\WebhookException;
  * `eventType` will be one of WebhookEventType — unknown event types resolve
  * to null so handlers can choose to ignore or log them rather than crashing.
  */
-final readonly class WebhookEvent
+readonly class WebhookEvent
 {
     /**
      * @param array<string, mixed> $data Event-specific payload (e.g. `data.object` from Stripe-style envelope)

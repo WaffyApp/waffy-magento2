@@ -15,7 +15,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  *
  * Example:  Money::fromMajor('100.50', 'SAR') === Money(10050, 'SAR')
  */
-final readonly class Money
+readonly class Money
 {
     private const MINOR_UNIT_EXPONENT = [
         'SAR' => 2,

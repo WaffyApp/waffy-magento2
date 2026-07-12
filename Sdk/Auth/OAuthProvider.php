@@ -20,7 +20,7 @@ use Waffy\Ecommerce\Exception\NotImplementedException;
  *   - Token endpoint URL + scopes
  *   - Refresh-token rotation policy
  */
-final class OAuthProvider implements AuthProvider
+class OAuthProvider implements AuthProvider
 {
     public function __construct(
         private readonly string $clientId,

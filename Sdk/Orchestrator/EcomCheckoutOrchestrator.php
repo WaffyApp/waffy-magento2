@@ -34,7 +34,7 @@ use Waffy\Ecommerce\Exception\AuthException;
  *
  * Returns CheckoutResult containing paymentUrl + customerToken (+ contractId + milestoneId).
  */
-final class EcomCheckoutOrchestrator
+class EcomCheckoutOrchestrator
 {
     private readonly ClientInterface $http;
 

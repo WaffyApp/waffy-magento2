@@ -20,7 +20,7 @@ use Waffy\Ecommerce\Model\PlatformOrder;
  * Also sent (accepted, no validation error):
  *   amount, currency, platform, metadata
  */
-final class OrderContractMapper
+class OrderContractMapper
 {
     public function __construct(
         private readonly string $platformId,

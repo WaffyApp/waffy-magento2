@@ -16,7 +16,7 @@ use Waffy\Ecommerce\Exception\AuthException;
  * The principal id is derived from the first segment of the token (if JWT) or
  * a hash of the token (if opaque) — never the token itself.
  */
-final class BearerTokenAuthProvider implements AuthProvider
+class BearerTokenAuthProvider implements AuthProvider
 {
     private string $principalId;
 

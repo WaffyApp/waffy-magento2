@@ -26,7 +26,7 @@ use Waffy\Ecommerce\Webhook\SignatureVerifier;
  * the first thrown exception is rethrown after all handlers complete so the
  * caller can react.
  */
-final class WebhookRouter
+class WebhookRouter
 {
     /**
      * @var array<string, list<Closure(WebhookEvent): void>>

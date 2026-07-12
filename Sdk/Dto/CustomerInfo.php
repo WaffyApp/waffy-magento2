@@ -13,7 +13,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  * clientUserId  — optional merchant-side user ID; falls back to phone digits in the orchestrator.
  * password      — unused by the API; omit or pass null.
  */
-final readonly class CustomerInfo
+readonly class CustomerInfo
 {
     public function __construct(
         public string $phoneNumber,

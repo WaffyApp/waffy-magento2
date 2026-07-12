@@ -14,7 +14,7 @@ use Throwable;
  * caller to react — retries are handled inside the SDK, so this exception
  * means "the operation has definitively failed".
  */
-final class ApiException extends WaffyException
+class ApiException extends WaffyException
 {
     /**
      * @param array<string, mixed>|null $responseBody Decoded response body if available

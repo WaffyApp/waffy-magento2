@@ -10,7 +10,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  * Merchant (seller / provider) identity passed to Waffy when creating a
  * payment. Identifies the recipient of the escrow funds.
  */
-final readonly class Merchant
+readonly class Merchant
 {
     public function __construct(
         public string $phone,

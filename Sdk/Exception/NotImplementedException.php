@@ -8,6 +8,6 @@ namespace Waffy\Ecommerce\Exception;
  * Thrown when a feature is scaffolded but not yet implemented — currently
  * OAuthProvider, pending Waffy Auth Service support.
  */
-final class NotImplementedException extends WaffyException
+class NotImplementedException extends WaffyException
 {
 }

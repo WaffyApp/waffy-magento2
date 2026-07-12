@@ -27,7 +27,7 @@ use Waffy\Ecommerce\Exception\ApiException;
  * Designed to be testable: the underlying Guzzle ClientInterface can be
  * injected so unit tests use a MockHandler.
  */
-final class WaffyClient
+class WaffyClient
 {
     private readonly ClientInterface $http;
     private readonly LoggerInterface $logger;

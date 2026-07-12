@@ -14,7 +14,7 @@ namespace Waffy\Ecommerce\Dto;
  * contractId    — Waffy parent contract ID, for your order records.
  * milestoneId   — Waffy milestone ID, for your order records.
  */
-final readonly class CheckoutResult
+readonly class CheckoutResult
 {
     public function __construct(
         public string $paymentUrl,

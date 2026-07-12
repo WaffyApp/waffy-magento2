@@ -13,7 +13,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  * dispute resolution). v1.0 mostly just totals these into the contract
  * amount, but keeping them structured avoids a breaking change later.
  */
-final readonly class OrderItem
+readonly class OrderItem
 {
     public function __construct(
         public string $sku,

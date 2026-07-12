@@ -20,7 +20,7 @@ use Ramsey\Uuid\Uuid;
  * The Waffy backend deduplicates by idempotency key inside its retention
  * window; we never send a previously-used key for a different payload.
  */
-final class KeyGenerator
+class KeyGenerator
 {
     public function random(): string
     {
