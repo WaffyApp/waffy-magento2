@@ -19,3 +19,4 @@ magento-test/
 
 # Build
 node_modules/
+dist/
