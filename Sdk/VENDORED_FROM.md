@@ -5,7 +5,9 @@ vendored directly into this module instead of being pulled in as a
 Composer dependency (`waffy-ecom-sdk-php` isn't published on Packagist).
 
 - Source: https://github.com/WaffyApp/waffy-ecom-sdk-php
-- Commit: e38dfc9f6398cf186b422318495b16b345e3d5b1 (2026-07-08)
+- Commit: b21aa3a (tag v0.1.1, 2026-07-12) — removed `final` from all
+  classes to satisfy Magento's Code Sniffer FoundFinal rule; this repo's
+  `Sdk/` copy and the canonical SDK are back in sync as of this commit.
 - Namespace: `Waffy\Ecommerce\` (unchanged — mapped via this module's
   `composer.json` psr-4 autoload to keep all existing `use` statements
   working without modification)
