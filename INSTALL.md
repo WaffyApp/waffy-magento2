@@ -37,14 +37,65 @@ Compatible with **Adobe Commerce (Cloud & on-premises) 2.4.x** and
 
 Pick the path that matches your store.
 
-### Option A — Adobe Commerce or Open Source, from the Marketplace (recommended)
+> **Which method works when?**
+> The Composer methods (Options A & B) rely on the extension being
+> **published on the Adobe Commerce Marketplace** — once approved, Adobe
+> hosts the package on its own Composer server (`repo.magento.com`), which
+> is what makes `composer require waffy/module-payment` resolve. That is
+> also **why no Packagist account is needed** — the Marketplace *is* the
+> Composer repository.
+>
+> **Before the extension is published** (e.g. internal testing, or manual
+> distribution), the package is not yet on `repo.magento.com`, so the
+> Composer command will not resolve. Use **Option C — manual install from
+> the ZIP**, which needs no Composer repository at all.
 
-1. In [Adobe Commerce Marketplace](https://commerce.adobe.com/), go to
-   **Your name → My Profile → My Purchases** and confirm the Waffy extension
-   is listed.
-2. Get your Composer keys from **My Profile → Access Keys** (the public key is
-   your Composer username, the private key is your password).
-3. On the server, from the Magento root, run:
+### Prerequisite for Options A & B — Adobe access keys
+
+Options A and B download from Adobe's **private** Composer server
+(`repo.magento.com`), which requires authentication. These credentials are
+called **access keys**, and every merchant needs their own — including
+Magento Open Source users, and including free extensions. They are **free**
+to generate; you just need an Adobe Commerce Marketplace account.
+
+> Access keys are **not** needed for Option C (manual ZIP) or Option D
+> (Composer via GitHub). Skip this section if you use one of those.
+
+**1. Get the keys**
+
+1. Sign in to the [Adobe Commerce Marketplace](https://commerce.adobe.com/).
+   (A free account is enough — no paid Adobe Commerce licence required.)
+2. Go to **Your name → My Profile → Access Keys**.
+3. Click **Create A New Access Key**, give it a name (e.g. your store name).
+4. You now have two values:
+   - **Public Key** → used as the Composer **username**
+   - **Private Key** → used as the Composer **password**
+
+**2. Give the keys to Composer**
+
+Either enter them when Composer prompts you during `composer require`, or set
+them up ahead of time in an `auth.json` file (no interactive prompt):
+
+```bash
+# Run from the Magento root. Replace with your own keys.
+composer config --global http-basic.repo.magento.com <PUBLIC_KEY> <PRIVATE_KEY>
+```
+
+This writes them to `~/.composer/auth.json` (global). To keep them per-project
+instead, drop the `--global` flag and Composer writes `auth.json` in the
+project root — **do not commit that file to Git**.
+
+**3. Confirm the extension is on your account**
+
+In the Marketplace, go to **My Profile → My Purchases** and confirm the Waffy
+extension is listed (this is what your keys are authorised to download).
+
+---
+
+### Option A — Adobe Commerce or Open Source, from the Marketplace (after publication)
+
+1. Make sure your **access keys are configured** (see the prerequisite above).
+2. On the server, from the Magento root, run:
 
 ```bash
 composer require waffy/module-payment:0.5.0
@@ -75,7 +126,9 @@ static-content deployment automatically.
 
 ### Option C — Manual install from the ZIP (on-premises / Open Source)
 
-Use this if you received `waffy-module-payment-0.5.0.zip` directly.
+Use this if you received `waffy-module-payment-0.5.0.zip` directly. **This is
+also the only method available before the extension is published on the
+Marketplace** — it needs no Composer repository.
 
 ```bash
 # From the Magento root
