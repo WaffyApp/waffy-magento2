@@ -1,45 +1,90 @@
-# Waffy Magento 2 Module
+# Waffy Escrow Payment for Magento 2
 
-Waffy escrow payment integration for Magento 2 / Adobe Commerce.
+[![Packagist Version](https://img.shields.io/packagist/v/waffy/module-payment.svg)](https://packagist.org/packages/waffy/module-payment)
+[![License](https://img.shields.io/packagist/l/waffy/module-payment.svg)](https://github.com/WaffyApp/waffy-magento2/blob/main/composer.json)
+[![PHP](https://img.shields.io/packagist/php-v/waffy/module-payment.svg)](https://www.php.net/)
 
-Composer package: `waffy/module-payment` (TBD — confirm name with Adobe
-Commerce Marketplace conventions before publishing).
+Add **[Waffy](https://waffyapp.com) escrow payments** to your Magento 2 or
+Adobe Commerce store. Instead of money moving straight from buyer to seller,
+payments are held safely by Waffy and released once the order is confirmed —
+building buyer trust and reducing payment risk for merchants.
 
-## Status
+Lightweight, native, and built on the official Waffy PHP SDK (bundled — no
+extra dependencies to install).
 
-**v1.0 — Not yet started.** This is Phase 1 of the project (per
-`/Users/Ahmed/.claude/plans/read-these-md-files-swirling-locket.md`).
+---
 
-Depends on:
+## Features
 
-- [`waffy-ecom-sdk-php`](https://github.com/WaffyApp/waffy-ecom-sdk-php) — required at runtime, installed via Composer
+- **Escrow-backed checkout** — Waffy appears as a payment method; buyers pay on
+  Waffy's secure hosted payment page, so card data never touches your store.
+- **Simple admin setup** — connect your account with your Waffy API
+  credentials and a sandbox/production toggle, all from the Magento admin.
+- **Automatic order status updates** — a built-in webhook receiver keeps the
+  Magento order in sync as the payment is secured in escrow and later released.
+- **Configurable contracts** — return policy, delivery/inspection/acceptance
+  flags, milestone deadline, and buyer-facing category.
+- **Self-contained** — the Waffy PHP SDK is bundled, so installation pulls in
+  everything the extension needs.
 
-## Roadmap
+## Compatibility
 
-### v1.0 (thin MVP)
+| | |
+|---|---|
+| Adobe Commerce (Cloud & on-premises) | 2.4.x |
+| Magento Open Source | 2.4.x |
+| PHP | 8.1+ |
 
-- Payment method registration (Magento appears at checkout)
-- Admin config: paste Waffy Bearer token + webhook signing secret, sandbox toggle
-- Magento Payment Gateway Adapter — `authorize`, `capture`, `cancel` wired to the SDK
-- Checkout: redirect buyer to Waffy hosted payment page
-- Webhook controller at `/V1/waffy/webhook` — verifies HMAC, auto-invoices on `PAYMENT_COMPLETED`
-- Order ↔ Waffy contract mapping table
+## Installation
 
-### v1.1 (Marketplace-ready)
+Install with Composer — works on Adobe Commerce and Magento Open Source, no
+access keys required:
 
-- Refund flow (credit memo → SDK → Waffy)
-- Dispute flow (webhook → order hold)
-- Cron settlement reconciliation
-- Bilingual AR + EN, RTL support
-- Adobe Commerce EQP compliance
-- User-guide PDF
-- Submit to Adobe Commerce Marketplace
+```bash
+composer require waffy/module-payment
+bin/magento module:enable Waffy_Payment
+bin/magento setup:upgrade
+bin/magento setup:di:compile
+bin/magento cache:flush
+```
 
-### v2.0 (post-gateway)
+> In **production** mode also run `bin/magento setup:static-content:deploy -f`.
 
-- Switch from Bearer-token to OAuth via `waffy-ecom-gateway`
-- All traffic routes through the gateway
+📖 **Full guide** (Adobe Marketplace, Cloud, and manual/offline installs):
+[INSTALL.md](INSTALL.md)
+
+## Configuration
+
+You'll need Waffy API credentials — contact **support@waffyapp.com** to get
+them.
+
+In the admin, go to **Stores → Configuration → Sales → Payment Methods →
+Waffy Escrow Payment**:
+
+1. Set **Environment** to **Sandbox** for testing.
+2. Enter your Waffy **Client ID / Secret** and **admin email & password**.
+3. Set your **Merchant Phone** (E.164, e.g. `+9665XXXXXXXX`).
+4. Copy the **Webhook URL** shown and send it to the Waffy team to register
+   your store.
+5. Adjust the contract settings, set **Enabled → Yes**, and **Save Config**.
+
+Then place a test order and pay with Waffy to confirm the flow end to end.
+See [INSTALL.md](INSTALL.md) for the detailed walkthrough and go-live steps.
+
+## How it works
+
+1. The buyer selects **Waffy** at checkout and is redirected to the secure
+   Waffy hosted payment page.
+2. Funds are held in escrow by Waffy, protecting both parties.
+3. Waffy notifies your store as the payment is secured and later released, and
+   the Magento order status updates automatically.
+
+## Support
+
+- 📧 **support@waffyapp.com**
+- 🌐 [waffyapp.com](https://waffyapp.com)
+- 🐛 [Issues](https://github.com/WaffyApp/waffy-magento2/issues)
 
 ## License
 
-Proprietary.
+Licensed under the [OSL-3.0](https://opensource.org/licenses/OSL-3.0) license.
