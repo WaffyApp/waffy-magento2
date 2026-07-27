@@ -40,9 +40,13 @@ class WaffyException extends RuntimeException
      * Pull the meaningful text out of the two error shapes the Waffy backend
      * returns:
      *   - OAuth2:     {"error":"invalid_grant","error_description":"..."}
-     *   - API errors: {"error":{"message":"Validation error","subErrors":[{"message":"..."}]}}
+     *   - API errors: {"error":{"message":"Validation error","subErrors":[
+     *                    {"field":"phoneNumber","rejectedValue":"+96650000",
+     *                     "message":"doesn't seem to be a valid phone number!"}]}}
      *
-     * Nested validation messages (subErrors) win over the generic wrapper.
+     * Field-level validation errors (subErrors) win over the generic wrapper,
+     * and we fold in the field + rejected value so the message names what was
+     * wrong (e.g. "doesn't seem to be a valid phone number! (phoneNumber: +96650000)").
      *
      * @param array<string, mixed> $body
      */
@@ -53,9 +57,49 @@ class WaffyException extends RuntimeException
             return $body['error_description'];
         }
 
-        // Recursively collect any human-readable message fields (API validation
-        // errors nest the specific reason under error.subErrors[].message, and
-        // the exact key varies by validator, so we scan the common ones).
+        // API validation shape: error.subErrors[] carry the specific reason,
+        // plus the field and the value the backend rejected.
+        $error = $body['error'] ?? null;
+        if (is_array($error)) {
+            if (is_array($error['subErrors'] ?? null)) {
+                $parts = [];
+                foreach ($error['subErrors'] as $sub) {
+                    if (!is_array($sub)) {
+                        continue;
+                    }
+                    $msg = null;
+                    foreach (['message', 'defaultMessage', 'reason', 'detail'] as $k) {
+                        if (isset($sub[$k]) && is_string($sub[$k]) && $sub[$k] !== '') {
+                            $msg = $sub[$k];
+                            break;
+                        }
+                    }
+                    if ($msg === null) {
+                        continue;
+                    }
+                    $field    = (isset($sub['field']) && is_string($sub['field'])) ? $sub['field'] : null;
+                    $rejected = $sub['rejectedValue'] ?? null;
+                    if ($field !== null && is_scalar($rejected) && (string) $rejected !== '') {
+                        $parts[] = sprintf('%s (%s: %s)', $msg, $field, (string) $rejected);
+                    } elseif ($field !== null) {
+                        $parts[] = sprintf('%s (%s)', $msg, $field);
+                    } else {
+                        $parts[] = $msg;
+                    }
+                }
+                if ($parts !== []) {
+                    return implode('; ', array_values(array_unique($parts)));
+                }
+            }
+
+            // No usable subErrors — fall back to the top-level error message.
+            if (isset($error['message']) && is_string($error['message']) && $error['message'] !== '') {
+                return $error['message'];
+            }
+        }
+
+        // Generic fallback: recursively collect any human-readable message fields
+        // for shapes we don't explicitly know (the exact key varies by validator).
         $messages = [];
         $collect  = static function ($node) use (&$collect, &$messages): void {
             if (!is_array($node)) {

@@ -18,6 +18,7 @@ use Waffy\Ecommerce\Dto\Party;
 use Waffy\Ecommerce\Dto\ProductInfo;
 use Waffy\Ecommerce\Exception\ApiException;
 use Waffy\Ecommerce\Exception\AuthException;
+use Waffy\Ecommerce\Exception\ValidationException;
 use Waffy\Payment\Model\Config;
 use Waffy\Payment\Model\OrchestratorFactory;
 
@@ -72,7 +73,7 @@ class Start implements HttpGetActionInterface
             $redirect->setUrl($finalUrl);
             return $redirect;
 
-        } catch (AuthException | ApiException $e) {
+        } catch (AuthException | ApiException | ValidationException $e) {
             $this->logger->error('Waffy checkout failed for order #' . $order->getIncrementId(), [
                 'exception'    => $e->getMessage(),
                 'responseBody' => $e->getResponseBody(),
@@ -80,8 +81,10 @@ class Start implements HttpGetActionInterface
             ]);
 
             // Prefer the specific message the Waffy backend returned (e.g. an
-            // invalid-phone validation error) over the generic fallback.
-            $backendMessage = $e->getUserMessage();
+            // invalid-phone validation error); for local ValidationExceptions the
+            // message itself is already buyer-friendly. Fall back to generic copy.
+            $backendMessage = $e->getUserMessage()
+                ?? ($e instanceof ValidationException ? $e->getMessage() : null);
             if ($backendMessage !== null && $backendMessage !== '') {
                 $this->messageManager->addErrorMessage(
                     __('Waffy payment could not be initiated: %1', $backendMessage),
@@ -103,8 +106,23 @@ class Start implements HttpGetActionInterface
         $clientId     = $this->config->getClientId($storeId);
         $clientSecret = $this->config->getClientSecret($storeId);
 
-        $billing   = $order->getBillingAddress();
-        $phone     = $this->normalisePhone((string) ($billing?->getTelephone() ?? ''));
+        $billing  = $order->getBillingAddress();
+        $shipping = $order->getShippingAddress();
+
+        // Use the number the buyer entered for THIS order first. In Magento the
+        // freshly-typed number lands on the shipping address; the billing address
+        // can silently keep the customer's saved default (see order #61). Fall
+        // back to billing, then to empty — we never fabricate a placeholder.
+        $rawPhone = (string) ($shipping?->getTelephone() ?: $billing?->getTelephone() ?: '');
+        $phone    = $this->normalisePhone($rawPhone);
+
+        if ($phone === '') {
+            throw new ValidationException(
+                'A valid mobile number is required to pay with Waffy. '
+                . 'Please add your phone number and try again.',
+            );
+        }
+
         $firstName = (string) ($billing?->getFirstname() ?? $order->getCustomerFirstname() ?? 'Customer');
         $lastName  = (string) ($billing?->getLastname() ?? $order->getCustomerLastname() ?? 'Guest');
         $customer = new CustomerInfo(
@@ -171,6 +189,8 @@ class Start implements HttpGetActionInterface
      * Attempt to normalise a local phone number to E.164.
      * For Saudi numbers: strip leading 0, prepend +966.
      * If it already starts with +, leave it as-is.
+     * Returns an empty string when there is no number to normalise — the caller
+     * decides how to handle a missing phone (we never fabricate a placeholder).
      *
      * TODO: improve or ask buyer to enter E.164 directly in checkout.
      */
@@ -178,7 +198,7 @@ class Start implements HttpGetActionInterface
     {
         $phone = preg_replace('/[\s\-().]/', '', $phone);
         if ($phone === '') {
-            return '+966000000000'; // placeholder — will fail validation at Waffy if not real
+            return '';
         }
         if (str_starts_with($phone, '+')) {
             return $phone;
