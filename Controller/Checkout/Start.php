@@ -75,12 +75,23 @@ class Start implements HttpGetActionInterface
         } catch (AuthException | ApiException $e) {
             $this->logger->error('Waffy checkout failed for order #' . $order->getIncrementId(), [
                 'exception'    => $e->getMessage(),
-                'responseBody' => $e instanceof ApiException ? $e->responseBody : null,
+                'responseBody' => $e->getResponseBody(),
                 'previous'     => $e->getPrevious()?->getMessage(),
             ]);
-            $this->messageManager->addErrorMessage(
-                __('Waffy payment could not be initiated. Please try again or choose a different payment method.'),
-            );
+
+            // Prefer the specific message the Waffy backend returned (e.g. an
+            // invalid-phone validation error) over the generic fallback.
+            $backendMessage = $e->getUserMessage();
+            if ($backendMessage !== null && $backendMessage !== '') {
+                $this->messageManager->addErrorMessage(
+                    __('Waffy payment could not be initiated: %1', $backendMessage),
+                );
+            } else {
+                $this->messageManager->addErrorMessage(
+                    __('Waffy payment could not be initiated. Please try again or choose a different payment method.'),
+                );
+            }
+
             return $this->redirectFactory->create()->setPath('checkout/cart');
         }
     }

@@ -28,4 +28,9 @@ class ApiException extends WaffyException
     ) {
         parent::__construct($message, $statusCode, $previous);
     }
+
+    public function getResponseBody(): ?array
+    {
+        return $this->responseBody;
+    }
 }

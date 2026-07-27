@@ -152,6 +152,23 @@ class EcomCheckoutOrchestrator
     // ── Private helpers ──────────────────────────────────────────────────────
 
     /**
+     * Build an AuthException from a failed Guzzle auth/sign-up request,
+     * capturing the full (untruncated) backend response body when one is
+     * present so callers can surface a meaningful message via getUserMessage().
+     * Guzzle truncates the body in $e->getMessage(), so we read it off the
+     * response directly.
+     */
+    private function authError(string $context, GuzzleException $e): AuthException
+    {
+        $decoded = $e instanceof BadResponseException
+            ? json_decode((string) $e->getResponse()->getBody(), true)
+            : null;
+        $body = is_array($decoded) ? $decoded : null;
+
+        return new AuthException($context . ': ' . $e->getMessage(), responseBody: $body, previous: $e);
+    }
+
+    /**
      * Step 1a — OAuth2 client_credentials grant.
      * Auth: Basic(clientId, clientSecret) · Body: grant_type=client_credentials
      * Returns: appToken (JWT) — used only for signUpCustomer (step 2).
@@ -165,7 +182,7 @@ class EcomCheckoutOrchestrator
                 'headers'     => ['Accept' => 'application/json'],
             ]);
         } catch (GuzzleException $e) {
-            throw new AuthException('Waffy client login failed: ' . $e->getMessage(), previous: $e);
+            throw $this->authError('Waffy client login failed', $e);
         }
 
         $data = $this->decode($response->getBody()->getContents());
@@ -195,7 +212,7 @@ class EcomCheckoutOrchestrator
                 'headers'     => ['Accept' => 'application/json'],
             ]);
         } catch (GuzzleException $e) {
-            throw new AuthException('Waffy merchant admin login failed: ' . $e->getMessage(), previous: $e);
+            throw $this->authError('Waffy merchant admin login failed', $e);
         }
 
         $data = $this->decode($response->getBody()->getContents());
@@ -238,7 +255,7 @@ class EcomCheckoutOrchestrator
                 ],
             ]);
         } catch (GuzzleException $e) {
-            throw new AuthException('Waffy customer sign-up failed: ' . $e->getMessage(), previous: $e);
+            throw $this->authError('Waffy customer sign-up failed', $e);
         }
 
         $data = $this->decode($response->getBody()->getContents());
@@ -274,7 +291,7 @@ class EcomCheckoutOrchestrator
                 'headers' => ['Accept' => 'application/json'],
             ]);
         } catch (GuzzleException $e) {
-            throw new AuthException('Waffy customer login failed: ' . $e->getMessage(), previous: $e);
+            throw $this->authError('Waffy customer login failed', $e);
         }
 
         $data = $this->decode($response->getBody()->getContents());
