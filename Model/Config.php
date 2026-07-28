@@ -7,6 +7,7 @@ namespace Waffy\Payment\Model;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Store\Model\ScopeInterface;
+use Waffy\Ecommerce\Config\Environment;
 
 /**
  * Reads all Waffy payment configuration from Magento system config.
@@ -16,13 +17,9 @@ class Config
 {
     private const PATH = 'payment/waffy_payment/';
 
-    private const SANDBOX_AUTH_URL = 'https://dev-auth.waffyapp.com';
-    private const SANDBOX_API_URL  = 'https://dev-api.waffyapp.com';
-
-    // TODO(TBD): confirm production URLs with the backend team.
-    // See project-docs/04-open-questions.md.
-    private const PRODUCTION_AUTH_URL = 'https://auth.waffyapp.com';
-    private const PRODUCTION_API_URL  = 'https://api.waffyapp.com';
+    // Per-environment base URLs are owned by the SDK (Waffy\Ecommerce\Config\Environment)
+    // so all platform plugins share one source of truth; an explicit override in
+    // store config still wins (see getAuthBaseUrl/getApiBaseUrl).
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -181,14 +178,14 @@ class Config
     public function getAuthBaseUrl(?int $storeId = null): string
     {
         return rtrim((string) $this->getValue('auth_base_url', $storeId), '/')
-            ?: ($this->isSandbox($storeId) ? self::SANDBOX_AUTH_URL : self::PRODUCTION_AUTH_URL);
+            ?: Environment::fromString($this->getEnvironment($storeId))->authBaseUrl();
     }
 
     /** Environment-derived URL; an explicit override in config wins. */
     public function getApiBaseUrl(?int $storeId = null): string
     {
         return rtrim((string) $this->getValue('api_base_url', $storeId), '/')
-            ?: ($this->isSandbox($storeId) ? self::SANDBOX_API_URL : self::PRODUCTION_API_URL);
+            ?: Environment::fromString($this->getEnvironment($storeId))->apiBaseUrl();
     }
 
     private function getValue(string $field, ?int $storeId): mixed

@@ -19,6 +19,7 @@ use Waffy\Ecommerce\Dto\ProductInfo;
 use Waffy\Ecommerce\Exception\ApiException;
 use Waffy\Ecommerce\Exception\AuthException;
 use Waffy\Ecommerce\Exception\ValidationException;
+use Waffy\Ecommerce\Support\PhoneNumber;
 use Waffy\Payment\Model\Config;
 use Waffy\Payment\Model\OrchestratorFactory;
 
@@ -114,7 +115,7 @@ class Start implements HttpGetActionInterface
         // can silently keep the customer's saved default (see order #61). Fall
         // back to billing, then to empty — we never fabricate a placeholder.
         $rawPhone = (string) ($shipping?->getTelephone() ?: $billing?->getTelephone() ?: '');
-        $phone    = $this->normalisePhone($rawPhone);
+        $phone    = PhoneNumber::toE164($rawPhone);
 
         if ($phone === '') {
             throw new ValidationException(
@@ -146,27 +147,20 @@ class Start implements HttpGetActionInterface
             returnFeePayee:  $this->config->getReturnFeePayee($storeId),
         );
 
-        $deadlineDays = $this->config->getMilestoneDeadlineDays($storeId);
-        $deadline     = (new \DateTimeImmutable())->modify("+{$deadlineDays} days")->format('Y-m-d\TH:i:s.000\Z');
-
-        $milestone = new MilestoneInfo(
-            amount:   (float) $order->getGrandTotal(),
-            deadline: $deadline,
-            currency: 'SAR',
+        $milestone = MilestoneInfo::inDays(
+            amount: (float) $order->getGrandTotal(),
+            days:   $this->config->getMilestoneDeadlineDays($storeId),
         );
 
-        $orderTotal    = (float) $order->getGrandTotal();
-        $merchantPhone = $this->config->getMerchantPhone($storeId);
-        $brokerPhone   = $this->config->getBrokerPhone($storeId);
-
-        $parties = [
-            new Party(phoneNumber: $phone,         role: 'CUSTOMER', amount: $orderTotal),
-            new Party(phoneNumber: $merchantPhone, role: 'PROVIDER', amount: $orderTotal, isSender: true),
-        ];
-
-        if ($brokerPhone !== '') {
-            $parties[] = new Party(phoneNumber: $brokerPhone, role: 'BROKER', amount: 0.0, arbitrator: true);
-        }
+        // Escrow party model (CUSTOMER / PROVIDER / optional BROKER) is owned by
+        // the SDK — see Party::escrowSet. Merchant/broker phones come from config
+        // and are expected to be E.164 already.
+        $parties = Party::escrowSet(
+            buyerPhone:    $phone,
+            merchantPhone: $this->config->getMerchantPhone($storeId),
+            brokerPhone:   $this->config->getBrokerPhone($storeId),
+            amount:        (float) $order->getGrandTotal(),
+        );
 
         $returnUrl = $order->getStore()->getBaseUrl()
             . 'waffy/checkout/return?order_id=' . $order->getIncrementId();
@@ -183,33 +177,5 @@ class Start implements HttpGetActionInterface
             redirectUrl:         $returnUrl,
             paymentType:         $this->config->getPaymentType($storeId),
         );
-    }
-
-    /**
-     * Attempt to normalise a local phone number to E.164.
-     * For Saudi numbers: strip leading 0, prepend +966.
-     * If it already starts with +, leave it as-is.
-     * Returns an empty string when there is no number to normalise — the caller
-     * decides how to handle a missing phone (we never fabricate a placeholder).
-     *
-     * TODO: improve or ask buyer to enter E.164 directly in checkout.
-     */
-    private function normalisePhone(string $phone): string
-    {
-        $phone = preg_replace('/[\s\-().]/', '', $phone);
-        if ($phone === '') {
-            return '';
-        }
-        if (str_starts_with($phone, '+')) {
-            return $phone;
-        }
-        if (str_starts_with($phone, '00')) {
-            return '+' . substr($phone, 2);
-        }
-        // Assume Saudi local: 05XXXXXXXX → +9665XXXXXXXX
-        if (str_starts_with($phone, '0')) {
-            return '+966' . substr($phone, 1);
-        }
-        return '+966' . $phone;
     }
 }

@@ -18,6 +18,7 @@ use Waffy\Ecommerce\Dto\Party;
 use Waffy\Ecommerce\Dto\ProductInfo;
 use Waffy\Ecommerce\Exception\ApiException;
 use Waffy\Ecommerce\Exception\AuthException;
+use Waffy\Ecommerce\Support\PhoneNumber;
 
 /**
  * Orchestrates the 7-step Waffy checkout flow and returns a CheckoutResult.
@@ -103,7 +104,8 @@ class EcomCheckoutOrchestrator
         // ── Step 2: sign up customer → clientUserToken (opaque) ────────────
         // clientUserId falls back to the phone (digits only) so sign-up and login
         // always use the same identifier for the same buyer.
-        $clientUserId = $request->customer->clientUserId ?? ltrim($request->customer->phoneNumber, '+');
+        $clientUserId = $request->customer->clientUserId
+            ?? PhoneNumber::toClientUserId($request->customer->phoneNumber);
 
         $clientUserToken = $this->signUpCustomer(
             $appToken,
@@ -149,7 +151,10 @@ class EcomCheckoutOrchestrator
         );
     }
 
-    // ── Private helpers ──────────────────────────────────────────────────────
+    // ── Flow steps & helpers ──────────────────────────────────────────────────
+    // The four auth/customer steps (1a–3) are public so tooling can drive the
+    // flow one step at a time for diagnostics; the contract steps (4–7) and the
+    // HTTP/token helpers remain private.
 
     /**
      * Build an AuthException from a failed Guzzle auth/sign-up request,
@@ -173,7 +178,7 @@ class EcomCheckoutOrchestrator
      * Auth: Basic(clientId, clientSecret) · Body: grant_type=client_credentials
      * Returns: appToken (JWT) — used only for signUpCustomer (step 2).
      */
-    private function fetchAppToken(string $clientId, string $clientSecret): string
+    public function fetchAppToken(string $clientId, string $clientSecret): string
     {
         try {
             $response = $this->http->request('POST', $this->authUrl('/oauth/token'), [
@@ -199,7 +204,7 @@ class EcomCheckoutOrchestrator
      * Auth: Basic(clientId, clientSecret) · Body: grant_type=password, username=adminEmail, password=adminPassword
      * Returns: merchantToken (JWT) — used as Bearer for all API calls (steps 4–7).
      */
-    private function fetchMerchantToken(string $clientId, string $clientSecret, string $clientAdminEmail, string $clientAdminPassword): string
+    public function fetchMerchantToken(string $clientId, string $clientSecret, string $clientAdminEmail, string $clientAdminPassword): string
     {
         try {
             $response = $this->http->request('POST', $this->authUrl('/oauth/token'), [
@@ -233,7 +238,7 @@ class EcomCheckoutOrchestrator
      * Idempotent: existing users return preExistingUser=true, token is still provided.
      * Note: password field is intentionally omitted — Waffy manages it internally.
      */
-    private function signUpCustomer(
+    public function signUpCustomer(
         string $merchantToken,
         string $clientUserId,
         string $phoneNumber,
@@ -274,7 +279,7 @@ class EcomCheckoutOrchestrator
      * Body: grant_type=password, username=<phone>, password=<clientUserToken>
      * Returns: access_token (JWT, ~5h TTL) — the customerToken used in step 7.
      */
-    private function fetchCustomerToken(
+    public function fetchCustomerToken(
         string $clientId,
         string $clientSecret,
         string $phoneNumber,

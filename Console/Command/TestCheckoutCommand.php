@@ -13,6 +13,7 @@ use Waffy\Ecommerce\Dto\CustomerInfo;
 use Waffy\Ecommerce\Dto\MilestoneInfo;
 use Waffy\Ecommerce\Dto\Party;
 use Waffy\Ecommerce\Dto\ProductInfo;
+use Waffy\Ecommerce\Support\PhoneNumber;
 use Waffy\Payment\Model\Config;
 use Waffy\Payment\Model\OrchestratorFactory;
 
@@ -92,17 +93,16 @@ class TestCheckoutCommand extends Command
                 returnPolicy:   $this->config->getReturnPolicy(),
                 returnFeePayee: $this->config->getReturnFeePayee(),
             ),
-            milestone: new MilestoneInfo(
-                amount:   $amount,
-                deadline: (new \DateTimeImmutable())
-                    ->modify('+' . $this->config->getMilestoneDeadlineDays() . ' days')
-                    ->format('Y-m-d\TH:i:s.000\Z'),
-                currency: 'SAR',
+            milestone: MilestoneInfo::inDays(
+                amount: $amount,
+                days:   $this->config->getMilestoneDeadlineDays(),
             ),
-            parties: [
-                new Party(phoneNumber: $phone,          role: 'CUSTOMER', amount: $amount),
-                new Party(phoneNumber: $merchantPhone,  role: 'PROVIDER', amount: $amount, isSender: true),
-            ],
+            parties: Party::escrowSet(
+                buyerPhone:    $phone,
+                merchantPhone: $merchantPhone,
+                brokerPhone:   null,
+                amount:        $amount,
+            ),
             redirectUrl: 'https://magento-test.ddev.site/waffy/checkout/return?order_id=SDK-TEST',
             paymentType: $this->config->getPaymentType(),
         );
@@ -112,37 +112,41 @@ class TestCheckoutCommand extends Command
 
             // ── Step 1a: app token (client_credentials) ──────────────────────
             $output->writeln('<comment>Step 1a: App Token (client_credentials)...</comment>');
-            $appToken = $this->callStep($orchestrator, 'fetchAppToken', [$clientId, $clientSecret]);
+            $appToken = $orchestrator->fetchAppToken($clientId, $clientSecret);
             $output->writeln('  appToken      : ' . substr($appToken, 0, 40) . '...');
 
             // ── Step 1b: merchant token (admin password grant) ───────────────
             $output->writeln('<comment>Step 1b: Merchant Token (admin login)...</comment>');
-            $merchantToken = $this->callStep($orchestrator, 'fetchMerchantToken', [
-                $clientId, $clientSecret,
-                $clientAdminEmail, $clientAdminPassword,
-            ]);
+            $merchantToken = $orchestrator->fetchMerchantToken(
+                $clientId,
+                $clientSecret,
+                $clientAdminEmail,
+                $clientAdminPassword,
+            );
             $output->writeln('  merchantToken : ' . substr($merchantToken, 0, 40) . '...');
 
             // ── Step 2: sign up ──────────────────────────────────────────────
             $output->writeln('<comment>Step 2: Customer Sign-Up...</comment>');
-            $derivedClientUserId = $request->customer->clientUserId ?? ltrim($request->customer->phoneNumber, '+');
+            $derivedClientUserId = $request->customer->clientUserId
+                ?? PhoneNumber::toClientUserId($request->customer->phoneNumber);
             $output->writeln('  clientUserId  : ' . $derivedClientUserId);
-            $clientUserToken = $this->callStep($orchestrator, 'signUpCustomer', [
+            $clientUserToken = $orchestrator->signUpCustomer(
                 $appToken,
                 $derivedClientUserId,
                 $request->customer->phoneNumber,
                 $request->customer->firstName,
                 $request->customer->lastName,
-            ]);
+            );
             $output->writeln('  clientUserToken : ' . $clientUserToken);
 
             // ── Step 3: customer login ───────────────────────────────────────
             $output->writeln('<comment>Step 3: Customer Login (password grant)...</comment>');
-            $customerToken = $this->callStep($orchestrator, 'fetchCustomerToken', [
-                $clientId, $clientSecret,
+            $customerToken = $orchestrator->fetchCustomerToken(
+                $clientId,
+                $clientSecret,
                 $request->customer->phoneNumber,
                 $clientUserToken,
-            ]);
+            );
             $output->writeln('  customerToken : ' . substr($customerToken, 0, 40) . '...');
 
             // ── Steps 4-7 via initiateCheckout ───────────────────────────────
@@ -166,13 +170,5 @@ class TestCheckoutCommand extends Command
             $output->writeln('<error>✗ ' . get_class($e) . ': ' . $e->getMessage() . '</error>');
             return Command::FAILURE;
         }
-    }
-
-    /** Calls a private method on the orchestrator via reflection — for step-by-step debugging only. */
-    private function callStep(object $obj, string $method, array $args): mixed
-    {
-        $ref = new \ReflectionMethod($obj, $method);
-        $ref->setAccessible(true);
-        return $ref->invokeArgs($obj, $args);
     }
 }

@@ -37,6 +37,36 @@ readonly class Party
         }
     }
 
+    /**
+     * The standard escrow party set for a single-milestone purchase:
+     *   - CUSTOMER — the buyer, responsible for the full amount;
+     *   - PROVIDER — the merchant, who initiates (sends) the payment;
+     *   - BROKER   — an optional arbitrator, added only when a broker phone is
+     *                supplied; carries no amount.
+     *
+     * This is the Waffy escrow model, identical across every storefront, so it
+     * lives here rather than being re-derived in each platform adapter.
+     *
+     * @return Party[]
+     */
+    public static function escrowSet(
+        string $buyerPhone,
+        string $merchantPhone,
+        ?string $brokerPhone,
+        float $amount,
+    ): array {
+        $parties = [
+            new self($buyerPhone, 'CUSTOMER', $amount),
+            new self($merchantPhone, 'PROVIDER', $amount, isSender: true),
+        ];
+
+        if ($brokerPhone !== null && $brokerPhone !== '') {
+            $parties[] = new self($brokerPhone, 'BROKER', 0.0, arbitrator: true);
+        }
+
+        return $parties;
+    }
+
     /** @return array<string, mixed> */
     public function toArray(): array
     {

@@ -12,7 +12,7 @@ namespace Waffy\Ecommerce\Webhook;
  * the client IP and the configured allowlist; the SDK owns the matching rules
  * (exact IPv4/IPv6, or IPv4 CIDR ranges).
  */
-final class WebhookIpAllowlist
+class WebhookIpAllowlist
 {
     /**
      * An empty allowlist means "no restriction" (allow all). Otherwise the IP

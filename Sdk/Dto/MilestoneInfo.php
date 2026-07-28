@@ -36,4 +36,28 @@ readonly class MilestoneInfo
             throw new ValidationException('MilestoneInfo: deadline cannot be empty.');
         }
     }
+
+    /**
+     * Build a milestone whose deadline is $days from now, formatted in the exact
+     * shape the Waffy API expects for the `deadLine` field
+     * (ISO 8601 with millisecond precision and a Z suffix, e.g.
+     * "2026-12-31T23:59:59.000Z").
+     *
+     * $now is injectable so the computed deadline is deterministically testable.
+     *
+     * @param AddOnFee[] $addOnFees
+     */
+    public static function inDays(
+        float $amount,
+        int $days,
+        string $currency = 'SAR',
+        array $addOnFees = [],
+        ?\DateTimeImmutable $now = null,
+    ): self {
+        $deadline = ($now ?? new \DateTimeImmutable())
+            ->modify("+{$days} days")
+            ->format('Y-m-d\TH:i:s.000\Z');
+
+        return new self($amount, $deadline, $currency, $addOnFees);
+    }
 }
