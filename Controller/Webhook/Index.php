@@ -14,25 +14,26 @@ use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Psr\Log\LoggerInterface;
+use Waffy\Ecommerce\Exception\WebhookException;
+use Waffy\Ecommerce\Model\WebhookEvent;
+use Waffy\Ecommerce\Webhook\OrderAction;
+use Waffy\Ecommerce\Webhook\WebhookIpAllowlist;
+use Waffy\Ecommerce\Webhook\WebhookOutcome;
 use Waffy\Payment\Model\Config;
 
 /**
  * POST /waffy/webhook
  *
- * Receives contract status updates from Waffy and syncs the Magento order.
+ * Thin Magento adapter over the SDK webhook logic. Responsibilities kept here
+ * are platform glue only: HTTP handling, CSRF bypass, resolving the client IP,
+ * locating the local order, and applying the outcome to a Magento order.
  *
- * Payload: { "contractId": "<milestoneId>", "status": "PAID|CASHOUT_IN_PROGRESS|COMPLETED|CREATED", "referenceId": "..." }
- * The "contractId" field in the Waffy webhook is actually the milestone ID stored in ext_order_id during checkout.
+ * The reusable business logic lives in the SDK:
+ *   - {@see WebhookIpAllowlist} — request-origin check (webhooks are unsigned)
+ *   - {@see WebhookEvent}       — parse the {contractId, status, referenceId} payload
+ *   - {@see WebhookOutcome}     — status → platform-neutral action + comments
  *
- * Status → Magento order transition:
- *   CREATED             → comment only (order already pending)
- *   PAID                → processing  (payment secured in escrow)
- *   CASHOUT_IN_PROGRESS → comment only (keep processing)
- *   COMPLETED           → comment only (escrow released; merchant fulfils)
- *
- * Access control: optional IP allowlist (payment/waffy_payment/webhook_allowed_ips).
- * Waffy webhooks are unsigned (confirmed 2026-06-28 via live capture), so the
- * allowlist is the only request-origin check available.
+ * The webhook `contractId` is the milestone ID stored in ext_order_id at checkout.
  */
 class Index implements HttpPostActionInterface, CsrfAwareActionInterface
 {
@@ -51,7 +52,7 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         $json = $this->jsonFactory->create();
 
         $clientIp = (string) $this->remoteAddress->getRemoteAddress();
-        if (!$this->isIpAllowed($clientIp)) {
+        if (!WebhookIpAllowlist::isAllowed($clientIp, $this->config->getWebhookAllowedIps())) {
             $this->logger->warning('Waffy webhook: request blocked by IP allowlist.', ['ip' => $clientIp]);
             return $json->setHttpResponseCode(403)->setData(['error' => 'Forbidden']);
         }
@@ -66,27 +67,28 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
 
         $this->logger->info('Waffy webhook received.', ['payload' => $payload]);
 
-        // Waffy webhooks are unsigned (confirmed 2026-06-28 via live capture).
-        // No signature verification needed.
-
-        $contractId  = (string) ($payload['contractId'] ?? '');
-        $status      = strtoupper((string) ($payload['status'] ?? ''));
-        $referenceId = (string) ($payload['referenceId'] ?? '');
-
-        if ($contractId === '') {
-            $this->logger->warning('Waffy webhook: missing contractId in payload.');
-            return $json->setHttpResponseCode(422)->setData(['error' => 'Missing contractId']);
+        // Waffy webhooks are unsigned (confirmed 2026-06-28); origin is checked
+        // via the IP allowlist above.
+        try {
+            $event = WebhookEvent::fromArray($payload);
+        } catch (WebhookException $e) {
+            $this->logger->warning('Waffy webhook: ' . $e->getMessage());
+            return $json->setHttpResponseCode(422)->setData(['error' => $e->getMessage()]);
         }
 
-        // contractId in the Waffy webhook = milestoneId stored in ext_order_id at checkout
-        $order = $this->findOrderByMilestoneId($contractId);
+        $order = $this->findOrderByMilestoneId($event->contractId);
         if ($order === null) {
-            $this->logger->warning('Waffy webhook: no order found for contractId.', ['contractId' => $contractId]);
-            // Return 200 so Waffy does not keep retrying for IDs we don't recognise
+            $this->logger->warning('Waffy webhook: no order found for contractId.', ['contractId' => $event->contractId]);
+            // Return 200 so Waffy does not keep retrying for IDs we don't recognise.
             return $json->setData(['received' => true]);
         }
 
-        $this->handleStatus($order, $status, $contractId, $referenceId);
+        if ($event->status === null) {
+            $this->logger->warning('Waffy webhook: unknown status.', ['status' => $event->rawStatus]);
+            return $json->setData(['received' => true]);
+        }
+
+        $this->applyOutcome($order, WebhookOutcome::forEvent($event));
 
         return $json->setData(['received' => true]);
     }
@@ -102,120 +104,30 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         return $order->getId() ? $order : null;
     }
 
-    private function handleStatus(Order $order, string $status, string $contractId, string $referenceId): void
-    {
-        $ref = $referenceId !== '' ? ' (ref: ' . $referenceId . ')' : '';
-
-        match ($status) {
-            'CREATED' => $this->addComment(
-                $order,
-                adminComment: 'Waffy: contract created' . $ref . '.',
-            ),
-            'PAYMENT_PROCESSING' => $this->addComment(
-                $order,
-                adminComment:    'Waffy: payment is being processed' . $ref . '.',
-                customerComment: 'Your payment is being processed.',
-            ),
-            'PAID' => $this->transitionTo(
-                $order,
-                state:           Order::STATE_PROCESSING,
-                status:          'processing',
-                adminComment:    'Waffy: payment secured in escrow. Milestone: ' . $contractId . $ref,
-                customerComment: 'Your payment has been received and secured.',
-            ),
-            'ACCEPTED' => $this->transitionTo(
-                $order,
-                state: Order::STATE_PROCESSING,
-                status: 'processing',
-                adminComment: 'Waffy: payment accepted, contract awaiting settlement' . $ref . '.',
-                customerComment: 'Your payment has been confirmed.',
-            ),
-            'CASHOUT_IN_PROGRESS' => $this->addComment(
-                $order,
-                adminComment: 'Waffy: funds release in progress' . $ref . '.',
-                customerComment: 'Your funds are being released.',
-            ),
-            'COMPLETED' => $this->addComment(
-                $order,
-                adminComment:    'Waffy: escrow completed, funds released to merchant' . $ref . '.',
-                customerComment: 'Your order has been completed.',
-            ),
-            default => $this->logger->warning('Waffy webhook: unknown status.', ['status' => $status]),
-        };
-    }
-
-    private function transitionTo(
-        Order $order,
-        string $state,
-        string $status,
-        string $adminComment,
-        string $customerComment = '',
-    ): void {
-        if ($order->getState() !== $state) {
-            $order->setState($state)->setStatus($status);
-        }
-        $order->addCommentToStatusHistory($adminComment, false, false);
-        if ($customerComment !== '') {
-            $order->addCommentToStatusHistory($customerComment, false, true);
-        }
-        $this->orderRepository->save($order);
-        $this->logger->info('Waffy webhook: order #' . $order->getIncrementId() . ' → ' . $state . '.');
-    }
-
-    private function addComment(
-        Order $order,
-        string $adminComment,
-        string $customerComment = '',
-    ): void {
-        $order->addCommentToStatusHistory($adminComment, false, false);
-        if ($customerComment !== '') {
-            $order->addCommentToStatusHistory($customerComment, false, true);
-        }
-        $this->orderRepository->save($order);
-        $this->logger->info('Waffy webhook: comment added to order #' . $order->getIncrementId() . '.');
-    }
-
-    // ── IP allowlist ─────────────────────────────────────────────────────────
-
     /**
-     * Empty allowlist = no restriction. Entries may be exact IPs (v4 or v6)
-     * or IPv4 CIDR ranges (e.g. 203.0.113.0/24).
+     * Apply the SDK's platform-neutral outcome to a Magento order: map the
+     * action onto Magento order state, then record the comments.
      */
-    private function isIpAllowed(string $clientIp): bool
+    private function applyOutcome(Order $order, WebhookOutcome $outcome): void
     {
-        $allowed = $this->config->getWebhookAllowedIps();
-        if ($allowed === []) {
-            return true;
+        if (
+            $outcome->action === OrderAction::MARK_PAYMENT_SECURED
+            && $order->getState() !== Order::STATE_PROCESSING
+        ) {
+            $order->setState(Order::STATE_PROCESSING)->setStatus('processing');
         }
 
-        foreach ($allowed as $entry) {
-            if ($this->ipMatches($clientIp, $entry)) {
-                return true;
-            }
+        if ($outcome->adminComment !== '') {
+            $order->addCommentToStatusHistory($outcome->adminComment, false, false);
+        }
+        if ($outcome->customerComment !== '') {
+            $order->addCommentToStatusHistory($outcome->customerComment, false, true);
         }
 
-        return false;
-    }
-
-    private function ipMatches(string $clientIp, string $entry): bool
-    {
-        if (!str_contains($entry, '/')) {
-            return $clientIp === $entry;
-        }
-
-        // IPv4 CIDR match
-        [$subnet, $bits] = explode('/', $entry, 2);
-        $ipLong     = ip2long($clientIp);
-        $subnetLong = ip2long($subnet);
-        $bits       = (int) $bits;
-
-        if ($ipLong === false || $subnetLong === false || $bits < 0 || $bits > 32) {
-            return false;
-        }
-
-        $mask = $bits === 0 ? 0 : (-1 << (32 - $bits));
-
-        return ($ipLong & $mask) === ($subnetLong & $mask);
+        $this->orderRepository->save($order);
+        $this->logger->info(
+            'Waffy webhook: order #' . $order->getIncrementId() . ' updated (' . $outcome->action->name . ').',
+        );
     }
 
     // ── CsrfAwareActionInterface ─────────────────────────────────────────────

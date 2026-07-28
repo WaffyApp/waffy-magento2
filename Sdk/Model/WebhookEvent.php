@@ -9,63 +9,52 @@ use Waffy\Ecommerce\Exception\WebhookException;
 /**
  * Parsed inbound webhook event from Waffy.
  *
- * The raw payload is decoded into structured fields plus a `data` array of
- * event-specific fields. Handlers registered with WebhookRouter receive an
- * instance of this class.
+ * Real payload shape (confirmed via live captures 2026-06-28):
+ *   { "contractId": "<milestoneId>", "status": "PAID|CREATED|...", "referenceId": "..." }
  *
- * `eventType` will be one of WebhookEventType — unknown event types resolve
- * to null so handlers can choose to ignore or log them rather than crashing.
+ * Note: the `contractId` field is actually the milestone ID the platform
+ * stored when checkout started (e.g. Magento's ext_order_id) — it is the key
+ * the adapter uses to locate the local order.
+ *
+ * Unknown status strings resolve to a null `status` so adapters can log and
+ * ignore them rather than crashing. The full decoded payload is kept in `raw`.
  */
 readonly class WebhookEvent
 {
     /**
-     * @param array<string, mixed> $data Event-specific payload (e.g. `data.object` from Stripe-style envelope)
+     * @param array<string, mixed> $raw The full decoded payload
      */
     public function __construct(
-        public string $id,
-        public string $rawType,
-        public ?WebhookEventType $eventType,
-        public array $data,
-        public int $createdAt,
+        public string $contractId,
+        public ?WebhookStatus $status,
+        public string $rawStatus,
+        public string $referenceId,
+        public array $raw,
     ) {
     }
 
     /**
-     * Parse a decoded JSON payload into a WebhookEvent. Throws on missing
-     * required fields — the platform adapter should respond HTTP 400.
+     * Parse a decoded JSON payload into a WebhookEvent. Throws when the
+     * required `contractId` is missing — the platform adapter should respond
+     * HTTP 400/422 in that case.
      *
      * @param array<string, mixed> $payload
      */
     public static function fromArray(array $payload): self
     {
-        $id = $payload['id'] ?? null;
-        $type = $payload['type'] ?? null;
-        $createdAt = $payload['created'] ?? null;
-        $dataWrap = $payload['data'] ?? [];
-
-        if (!is_string($id) || $id === '') {
-            throw new WebhookException('Webhook payload missing "id".');
-        }
-        if (!is_string($type) || $type === '') {
-            throw new WebhookException('Webhook payload missing "type".');
-        }
-        if (!is_int($createdAt) && !is_string($createdAt)) {
-            throw new WebhookException('Webhook payload missing "created" timestamp.');
-        }
-        if (!is_array($dataWrap)) {
-            throw new WebhookException('Webhook payload "data" must be an object.');
+        $contractId = (string) ($payload['contractId'] ?? '');
+        if ($contractId === '') {
+            throw new WebhookException('Webhook payload missing "contractId".');
         }
 
-        $data = isset($dataWrap['object']) && is_array($dataWrap['object'])
-            ? $dataWrap['object']
-            : $dataWrap;
+        $rawStatus = strtoupper((string) ($payload['status'] ?? ''));
 
         return new self(
-            id: $id,
-            rawType: $type,
-            eventType: WebhookEventType::tryFrom($type),
-            data: $data,
-            createdAt: is_int($createdAt) ? $createdAt : (int) $createdAt,
+            contractId:  $contractId,
+            status:      WebhookStatus::tryFrom($rawStatus),
+            rawStatus:   $rawStatus,
+            referenceId: (string) ($payload['referenceId'] ?? ''),
+            raw:         $payload,
         );
     }
 }
