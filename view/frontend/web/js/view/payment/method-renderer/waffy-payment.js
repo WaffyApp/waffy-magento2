@@ -48,34 +48,51 @@ define([
                 return false;
             }
 
+            // No cancel/close control: the single "Continue to Waffy" button
+            // switches to a loading state on click and stays there while the
+            // order is placed and the Waffy redirect is fetched, so the buyer
+            // can read the notice while it loads.
             confirm({
                 title: $t('You are being redirected to Waffy'),
                 modalClass: 'waffy-disclaimer-modal',
+                clickableOverlay: false,
+                keyEventHandlers: {
+                    escapeKey: function () {}
+                },
                 content: '<p>' + $t(
                     'To complete your order you will be taken to Waffy\'s secure escrow payment page.' +
                     ' Once your payment is confirmed, you will be redirected back here to your order confirmation.'
                 ) + '</p>',
                 buttons: [
                     {
-                        text: $t('Cancel'),
-                        class: 'action-secondary action-dismiss',
-                        click: function (e) {
-                            this.closeModal(e);
-                        }
-                    },
-                    {
                         text: $t('Continue to Waffy'),
-                        class: 'action-primary action-accept',
-                        click: function (e) {
-                            this.closeModal(e, true);
+                        class: 'action-primary action-accept waffy-disclaimer-continue',
+                        click: function (clickEvent) {
+                            var button = clickEvent.currentTarget;
+
+                            if (button.disabled) {
+                                return;
+                            }
+                            button.classList.add('-loading');
+                            button.disabled = true;
+
+                            // On success afterPlaceOrder() sets waffyRedirecting
+                            // and the browser navigates away while the button
+                            // stays loading. If placing the order fails there is
+                            // no redirect, so re-enable the button to allow retry.
+                            self.waffyRedirecting = false;
+                            var sub = self.isPlaceOrderActionAllowed.subscribe(function (allowed) {
+                                if (allowed && !self.waffyRedirecting) {
+                                    button.classList.remove('-loading');
+                                    button.disabled = false;
+                                    sub.dispose();
+                                }
+                            });
+
+                            proceed.call(self, data, event);
                         }
                     }
-                ],
-                actions: {
-                    confirm: function () {
-                        proceed.call(self, data, event);
-                    }
-                }
+                ]
             });
 
             return false;
@@ -89,6 +106,7 @@ define([
          * payment page — otherwise checkout briefly becomes interactive again.
          */
         afterPlaceOrder: function () {
+            this.waffyRedirecting = true;
             fullScreenLoader.startLoader();
             window.location.replace(url.build('waffy/checkout/start'));
         }

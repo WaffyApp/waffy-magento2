@@ -53,3 +53,37 @@
     background-color: #3972dc;
     border-color: #3972dc;
 }
+
+/* Single-action disclaimer: no header close, Continue button loads in place. */
+.waffy-disclaimer-modal .modal-header .action-close {
+    display: none;
+}
+
+.waffy-disclaimer-continue {
+    position: relative;
+}
+
+.waffy-disclaimer-continue.-loading {
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.waffy-disclaimer-continue.-loading:after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1rem;
+    height: 1rem;
+    margin: -0.5rem 0 0 -0.5rem;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: waffy-spin 0.7s linear infinite;
+}
+
+@keyframes waffy-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
