@@ -31,3 +31,25 @@
     background-color: #1169e5 !important;
     cursor: not-allowed !important;
 }
+
+/* Redirect disclaimer (Magento_Ui confirm modal shown before place order) */
+.waffy-disclaimer-modal .modal-title {
+    color: #0D44AD;
+}
+
+.waffy-disclaimer-modal .modal-content p {
+    margin: 0;
+    line-height: 1.6;
+    color: #333333;
+}
+
+.waffy-disclaimer-modal .action-primary {
+    background-color: #0D44AD;
+    border-color: #0D44AD;
+}
+
+.waffy-disclaimer-modal .action-primary:hover,
+.waffy-disclaimer-modal .action-primary:focus {
+    background-color: #3972dc;
+    border-color: #3972dc;
+}
