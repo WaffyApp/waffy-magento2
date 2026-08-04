@@ -1,11 +1,12 @@
 define([
+    'jquery',
     'Magento_Checkout/js/view/payment/default',
     'Magento_Checkout/js/model/full-screen-loader',
     'Magento_Checkout/js/model/payment/additional-validators',
-    'Magento_Ui/js/modal/confirm',
+    'Magento_Ui/js/modal/modal',
     'mage/translate',
     'mage/url'
-], function (Component, fullScreenLoader, additionalValidators, confirm, $t, url) {
+], function ($, Component, fullScreenLoader, additionalValidators, modal, $t, url) {
     'use strict';
 
     return Component.extend({
@@ -24,12 +25,11 @@ define([
 
         /**
          * Waffy is a redirect method: the real payment URL only exists after the
-         * order is placed server-side. Before placing it we show a disclaimer so
-         * the buyer knows they are about to leave the store for the Waffy hosted
-         * payment page and will be brought back afterwards. Only when they accept
-         * do we run the real place-order flow (parent placeOrder), which ends in
-         * afterPlaceOrder() redirecting to the Waffy checkout Start controller.
-         * Nothing is committed if they cancel.
+         * order is placed server-side. We open a disclaimer modal, place the
+         * order, and prepare the Waffy link in the background — the modal's
+         * "Continue to Waffy" button shows a loading indicator and is disabled
+         * until the link is ready, then becomes clickable so the buyer can
+         * proceed once they've read the notice.
          */
         placeOrder: function (data, event) {
             var self = this,
@@ -39,7 +39,7 @@ define([
                 event.preventDefault();
             }
 
-            // Mirror the parent's guards so we never pop the disclaimer only for
+            // Mirror the parent's guards so we never open the modal only for
             // place-order to then silently fail (e.g. terms not accepted).
             if (!this.validate() ||
                 !additionalValidators.validate() ||
@@ -48,67 +48,115 @@ define([
                 return false;
             }
 
-            // No cancel/close control: the single "Continue to Waffy" button
-            // switches to a loading state on click and stays there while the
-            // order is placed and the Waffy redirect is fetched, so the buyer
-            // can read the notice while it loads.
-            confirm({
-                title: $t('You are being redirected to Waffy'),
-                modalClass: 'waffy-disclaimer-modal',
-                clickableOverlay: false,
-                keyEventHandlers: {
-                    escapeKey: function () {}
-                },
-                content: '<p>' + $t(
-                    'To complete your order you will be taken to Waffy\'s secure escrow payment page.' +
-                    ' Once your payment is confirmed, you will be redirected back here to your order confirmation.'
-                ) + '</p>',
-                buttons: [
-                    {
-                        text: $t('Continue to Waffy'),
-                        class: 'action-primary action-accept waffy-disclaimer-continue',
-                        click: function (clickEvent) {
-                            var button = clickEvent.currentTarget;
-
-                            if (button.disabled) {
-                                return;
-                            }
-                            button.classList.add('-loading');
-                            button.disabled = true;
-
-                            // On success afterPlaceOrder() sets waffyRedirecting
-                            // and the browser navigates away while the button
-                            // stays loading. If placing the order fails there is
-                            // no redirect, so re-enable the button to allow retry.
-                            self.waffyRedirecting = false;
-                            var sub = self.isPlaceOrderActionAllowed.subscribe(function (allowed) {
-                                if (allowed && !self.waffyRedirecting) {
-                                    button.classList.remove('-loading');
-                                    button.disabled = false;
-                                    sub.dispose();
-                                }
-                            });
-
-                            proceed.call(self, data, event);
-                        }
-                    }
-                ]
-            });
+            this._openDisclaimer();
+            proceed.call(self, data, event); // places the order; afterPlaceOrder() fetches the link
 
             return false;
         },
 
         /**
-         * Called by the checkout JS after the order is successfully placed.
-         * place-order.js already stopped the full-screen loader in its own
-         * .always() handler by this point, so we restart it here to keep the
-         * page blocked until the browser actually navigates to the Waffy
-         * payment page — otherwise checkout briefly becomes interactive again.
+         * Called by the checkout JS once the order is successfully placed. Rather
+         * than redirecting immediately we ask the Start controller for the Waffy
+         * URL (JSON), then flip the modal button from loading to ready.
          */
         afterPlaceOrder: function () {
-            this.waffyRedirecting = true;
-            fullScreenLoader.startLoader();
-            window.location.replace(url.build('waffy/checkout/start'));
+            var self = this;
+
+            $.ajax({
+                url: url.build('waffy/checkout/start'),
+                data: { format: 'json' },
+                dataType: 'json',
+                method: 'GET',
+                cache: false
+            }).done(function (res) {
+                if (res && res.url) {
+                    self._readyUrl = res.url;
+                    self._setButtonReady();
+                } else {
+                    self._setButtonError(res && res.message);
+                }
+            }).fail(function () {
+                self._setButtonError();
+            });
+        },
+
+        /** Build (once) and open the disclaimer modal with its button loading. */
+        _openDisclaimer: function () {
+            var self = this;
+
+            if (!this._modalEl) {
+                this._modalEl = $(
+                    '<div class="waffy-disclaimer">' +
+                        '<p class="waffy-disclaimer__body" data-role="body">' +
+                            $t('To complete your order you will be taken to Waffy\'s secure escrow payment page.' +
+                               ' Once your payment is confirmed, you will be redirected back here to your order confirmation.') +
+                        '</p>' +
+                        '<div class="waffy-disclaimer__actions">' +
+                            '<button type="button" class="action primary waffy-btn waffy-disclaimer-continue" disabled>' +
+                                '<span data-role="label">' + $t('Continue to Waffy') + '</span>' +
+                            '</button>' +
+                        '</div>' +
+                    '</div>'
+                );
+
+                this._modalEl.modal({
+                    title: $t('You are being redirected to Waffy'),
+                    modalClass: 'waffy-disclaimer-modal',
+                    clickableOverlay: false,
+                    keyEventHandlers: {}
+                });
+
+                this._continueBtn = this._modalEl.find('.waffy-disclaimer-continue');
+                this._continueBtn.on('click', function () {
+                    if (this.disabled) {
+                        return;
+                    }
+                    if (self._readyUrl) {
+                        fullScreenLoader.startLoader();
+                        window.location.replace(self._readyUrl);
+                    } else if (self._errorPath) {
+                        window.location.href = url.build(self._errorPath);
+                    }
+                });
+            }
+
+            // Reset to the loading state on every open.
+            this._readyUrl = null;
+            this._errorPath = null;
+            this._continueBtn
+                .prop('disabled', true)
+                .addClass('-loading')
+                .find('[data-role="label"]').text($t('Continue to Waffy'));
+            this._modalEl.modal('openModal');
+        },
+
+        /** Link is ready — enable the button so the buyer can proceed. */
+        _setButtonReady: function () {
+            if (!this._continueBtn) {
+                return;
+            }
+            this._continueBtn
+                .removeClass('-loading')
+                .prop('disabled', false)
+                .find('[data-role="label"]').text($t('Continue to Waffy'));
+        },
+
+        /**
+         * Preparing the link failed. Show the reason and turn the button into a
+         * "Return to cart" action (the order stays as pending_payment for retry).
+         */
+        _setButtonError: function (message) {
+            if (!this._modalEl) {
+                return;
+            }
+            this._modalEl.find('[data-role="body"]').text(
+                message || $t('Waffy payment could not be initiated. Please try again or choose a different payment method.')
+            );
+            this._errorPath = 'checkout/cart';
+            this._continueBtn
+                .removeClass('-loading')
+                .prop('disabled', false)
+                .find('[data-role="label"]').text($t('Return to cart'));
         }
     });
 });

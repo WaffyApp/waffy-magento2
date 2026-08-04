@@ -59,6 +59,18 @@
     display: none;
 }
 
+.waffy-disclaimer__body {
+    margin: 0;
+    line-height: 1.6;
+    color: #333333;
+}
+
+.waffy-disclaimer__actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
 .waffy-disclaimer-continue {
     position: relative;
 }

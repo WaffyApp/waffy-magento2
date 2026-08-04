@@ -6,6 +6,8 @@ namespace Waffy\Payment\Controller\Checkout;
 
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\App\Action\HttpGetActionInterface;
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Controller\Result\RedirectFactory;
 use Magento\Framework\Message\ManagerInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
@@ -27,13 +29,23 @@ use Waffy\Payment\Model\OrchestratorFactory;
  * GET /waffy/checkout/start
  *
  * Called after the order is placed. Builds a CheckoutRequest from the last
- * order, calls the Waffy SDK, and redirects the buyer to the Waffy payment page.
+ * order, calls the Waffy SDK, and hands back the Waffy payment URL.
+ *
+ * Two response modes off the same logic:
+ *   - default            → HTTP redirect to the Waffy payment page (direct hit).
+ *   - ?format=json       → JSON { url } so the checkout disclaimer modal can
+ *                          prepare the link in the background and only enable its
+ *                          "Continue to Waffy" button once the link is ready.
+ * On failure the JSON mode returns { error: true, message } instead of the
+ * redirect-to-cart-with-flash-message the direct mode uses.
  */
 class Start implements HttpGetActionInterface
 {
     public function __construct(
         private readonly CheckoutSession $checkoutSession,
         private readonly RedirectFactory $redirectFactory,
+        private readonly JsonFactory $jsonFactory,
+        private readonly RequestInterface $request,
         private readonly ManagerInterface $messageManager,
         private readonly Config $config,
         private readonly OrchestratorFactory $orchestratorFactory,
@@ -43,10 +55,13 @@ class Start implements HttpGetActionInterface
 
     public function execute(): \Magento\Framework\Controller\ResultInterface
     {
-        $order = $this->checkoutSession->getLastRealOrder();
+        $wantsJson = $this->request->getParam('format') === 'json';
+        $order     = $this->checkoutSession->getLastRealOrder();
 
         if (!$order || !$order->getId()) {
-            return $this->redirectFactory->create()->setPath('checkout/cart');
+            return $wantsJson
+                ? $this->jsonFactory->create()->setData(['error' => true, 'message' => (string) __('Your order could not be found. Please try again.')])
+                : $this->redirectFactory->create()->setPath('checkout/cart');
         }
 
         try {
@@ -70,6 +85,10 @@ class Start implements HttpGetActionInterface
 
             $this->checkoutSession->setWaffyPaymentUrl($finalUrl);
 
+            if ($wantsJson) {
+                return $this->jsonFactory->create()->setData(['url' => $finalUrl]);
+            }
+
             $redirect = $this->redirectFactory->create();
             $redirect->setUrl($finalUrl);
             return $redirect;
@@ -86,16 +105,15 @@ class Start implements HttpGetActionInterface
             // message itself is already buyer-friendly. Fall back to generic copy.
             $backendMessage = $e->getUserMessage()
                 ?? ($e instanceof ValidationException ? $e->getMessage() : null);
-            if ($backendMessage !== null && $backendMessage !== '') {
-                $this->messageManager->addErrorMessage(
-                    __('Waffy payment could not be initiated: %1', $backendMessage),
-                );
-            } else {
-                $this->messageManager->addErrorMessage(
-                    __('Waffy payment could not be initiated. Please try again or choose a different payment method.'),
-                );
+            $message = ($backendMessage !== null && $backendMessage !== '')
+                ? (string) __('Waffy payment could not be initiated: %1', $backendMessage)
+                : (string) __('Waffy payment could not be initiated. Please try again or choose a different payment method.');
+
+            if ($wantsJson) {
+                return $this->jsonFactory->create()->setData(['error' => true, 'message' => $message]);
             }
 
+            $this->messageManager->addErrorMessage($message);
             return $this->redirectFactory->create()->setPath('checkout/cart');
         }
     }
