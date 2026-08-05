@@ -4,9 +4,10 @@ define([
     'Magento_Checkout/js/model/full-screen-loader',
     'Magento_Checkout/js/model/payment/additional-validators',
     'Magento_Ui/js/modal/modal',
+    'Magento_Ui/js/model/messageList',
     'mage/translate',
     'mage/url'
-], function ($, Component, fullScreenLoader, additionalValidators, modal, $t, url) {
+], function ($, Component, fullScreenLoader, additionalValidators, modal, globalMessageList, $t, url) {
     'use strict';
 
     return Component.extend({
@@ -48,7 +49,22 @@ define([
                 return false;
             }
 
+            this._orderPlaced = false;
             this._openDisclaimer();
+
+            // If placing the order fails, afterPlaceOrder() never runs. Watch the
+            // place-order guard flip back to true and, if the order wasn't placed,
+            // close the modal (Magento shows its own placement error).
+            var sub = this.isPlaceOrderActionAllowed.subscribe(function (allowed) {
+                if (!allowed) {
+                    return;
+                }
+                sub.dispose();
+                if (!self._orderPlaced) {
+                    self._closeModal();
+                }
+            });
+
             proceed.call(self, data, event); // places the order; afterPlaceOrder() fetches the link
 
             return false;
@@ -62,6 +78,8 @@ define([
         afterPlaceOrder: function () {
             var self = this;
 
+            this._orderPlaced = true;
+
             $.ajax({
                 url: url.build('waffy/checkout/start'),
                 data: { format: 'json' },
@@ -73,10 +91,10 @@ define([
                     self._readyUrl = res.url;
                     self._setButtonReady();
                 } else {
-                    self._setButtonError(res && res.message);
+                    self._closeWithError(res && res.message);
                 }
             }).fail(function () {
-                self._setButtonError();
+                self._closeWithError();
             });
         },
 
@@ -103,7 +121,8 @@ define([
                     title: $t('You are being redirected to Waffy'),
                     modalClass: 'waffy-disclaimer-modal',
                     clickableOverlay: false,
-                    keyEventHandlers: {}
+                    keyEventHandlers: {},
+                    buttons: [] // no default "OK" footer button; our own button lives in the content
                 });
 
                 this._continueBtn = this._modalEl.find('.waffy-disclaimer-continue');
@@ -114,19 +133,15 @@ define([
                     if (self._readyUrl) {
                         fullScreenLoader.startLoader();
                         window.location.replace(self._readyUrl);
-                    } else if (self._errorPath) {
-                        window.location.href = url.build(self._errorPath);
                     }
                 });
             }
 
             // Reset to the loading state on every open.
             this._readyUrl = null;
-            this._errorPath = null;
             this._continueBtn
                 .prop('disabled', true)
-                .addClass('-loading')
-                .find('[data-role="label"]').text($t('Continue to Waffy'));
+                .addClass('-loading');
             this._modalEl.modal('openModal');
         },
 
@@ -137,26 +152,27 @@ define([
             }
             this._continueBtn
                 .removeClass('-loading')
-                .prop('disabled', false)
-                .find('[data-role="label"]').text($t('Continue to Waffy'));
+                .prop('disabled', false);
+        },
+
+        /** Close the disclaimer modal if it is open. */
+        _closeModal: function () {
+            if (this._modalEl) {
+                this._modalEl.modal('closeModal');
+            }
         },
 
         /**
-         * Preparing the link failed. Show the reason and turn the button into a
-         * "Return to cart" action (the order stays as pending_payment for retry).
+         * Preparing the link failed — close the modal and surface the reason in
+         * the checkout message area so the buyer can retry or pick another
+         * method. The order remains as pending_payment.
          */
-        _setButtonError: function (message) {
-            if (!this._modalEl) {
-                return;
-            }
-            this._modalEl.find('[data-role="body"]').text(
-                message || $t('Waffy payment could not be initiated. Please try again or choose a different payment method.')
-            );
-            this._errorPath = 'checkout/cart';
-            this._continueBtn
-                .removeClass('-loading')
-                .prop('disabled', false)
-                .find('[data-role="label"]').text($t('Return to cart'));
+        _closeWithError: function (message) {
+            this._closeModal();
+            globalMessageList.addErrorMessage({
+                message: message ||
+                    $t('Waffy payment could not be initiated. Please try again or choose a different payment method.')
+            });
         }
     });
 });
