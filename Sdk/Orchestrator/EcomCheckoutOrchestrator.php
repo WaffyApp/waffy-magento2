@@ -13,12 +13,12 @@ use JsonException;
 use Waffy\Ecommerce\Contract\TokenStore;
 use Waffy\Ecommerce\Dto\CheckoutRequest;
 use Waffy\Ecommerce\Dto\CheckoutResult;
+use Waffy\Ecommerce\Dto\CustomerInfo;
 use Waffy\Ecommerce\Dto\MilestoneInfo;
 use Waffy\Ecommerce\Dto\Party;
 use Waffy\Ecommerce\Dto\ProductInfo;
 use Waffy\Ecommerce\Exception\ApiException;
 use Waffy\Ecommerce\Exception\AuthException;
-use Waffy\Ecommerce\Support\PhoneNumber;
 
 /**
  * Orchestrates the 7-step Waffy checkout flow and returns a CheckoutResult.
@@ -34,9 +34,42 @@ use Waffy\Ecommerce\Support\PhoneNumber;
  *   7.  GET   {apiBase}/api/external/contracts/startPayment/{milestoneId}/{clientId} → paymentUrl
  *
  * Returns CheckoutResult containing paymentUrl + customerToken (+ contractId + milestoneId).
+ *
+ * Token caching: every token is cached in the TokenStore and reused until it is
+ * within a leeway window of its `exp` claim. None of the four auth calls above
+ * has to happen during checkout if the cache is warm — see warmMerchantTokens()
+ * (run it on a schedule) and ensureCustomerToken() (run it when the buyer logs in).
  */
 class EcomCheckoutOrchestrator
 {
+    /**
+     * Remaining life a cached app/merchant token must have to be used mid-checkout.
+     * Short, because these are only used for server-to-server calls we make within
+     * the same request — a token that outlives the request is good enough.
+     */
+    public const CHECKOUT_LEEWAY_SECONDS = 60;
+
+    /**
+     * Remaining life a cached *customer* token must have to be handed to the buyer.
+     * Much longer than CHECKOUT_LEEWAY_SECONDS because this token travels to the
+     * Waffy-hosted payment page (`userTokenUrl`) and has to still be valid while
+     * the buyer fills in their card details, not just while our request runs.
+     */
+    public const CUSTOMER_LEEWAY_SECONDS = 900;
+
+    /**
+     * Refresh-ahead window used by warmMerchantTokens(): a scheduled warm-up
+     * refreshes anything expiring sooner than this, so a token never expires on a
+     * customer-facing request. Must exceed the warm-up interval.
+     */
+    public const WARMUP_LEEWAY_SECONDS = 1800;
+
+    /** Total timeout for warm-up / prefetch calls (see warmHttpClient()). */
+    public const WARM_TIMEOUT_SECONDS = 8.0;
+
+    /** Connect timeout for warm-up / prefetch calls (see warmHttpClient()). */
+    public const WARM_CONNECT_TIMEOUT_SECONDS = 5.0;
+
     private readonly ClientInterface $http;
 
     public function __construct(
@@ -48,6 +81,25 @@ class EcomCheckoutOrchestrator
         $this->http = $httpClient ?? new GuzzleClient([
             'timeout'         => 30.0,
             'connect_timeout' => 10.0,
+            'http_errors'     => true,
+        ]);
+    }
+
+    /**
+     * HTTP client for the warm-up and prefetch paths.
+     *
+     * Checkout can afford to wait 30s for Waffy — the buyer is already committed
+     * and the alternative is a failed order. A warm-up runs on a cron tick or a
+     * storefront page view, where a hung request is worse than a skipped refresh
+     * (the lazy fetch at checkout is still there as the backstop), so those paths
+     * get a much tighter budget. The numbers live here rather than in each plugin
+     * so all platforms share one policy.
+     */
+    public static function warmHttpClient(): ClientInterface
+    {
+        return new GuzzleClient([
+            'timeout'         => self::WARM_TIMEOUT_SECONDS,
+            'connect_timeout' => self::WARM_CONNECT_TIMEOUT_SECONDS,
             'http_errors'     => true,
         ]);
     }
@@ -84,46 +136,31 @@ class EcomCheckoutOrchestrator
     private function runCheckout(CheckoutRequest $request, bool $useCachedTokens): CheckoutResult
     {
         // ── Step 1: app token + merchant token (served from cache when still valid) ─
-        $appToken = $useCachedTokens ? $this->tokenStore->getAppToken($request->clientId) : null;
-        if (!$this->isTokenValid($appToken)) {
-            $appToken = $this->fetchAppToken($request->clientId, $request->clientSecret);
-            $this->tokenStore->storeAppToken($request->clientId, $appToken);
-        }
-
-        $merchantToken = $useCachedTokens ? $this->tokenStore->getMerchantToken($request->clientId) : null;
-        if (!$this->isTokenValid($merchantToken)) {
-            $merchantToken = $this->fetchMerchantToken(
-                $request->clientId,
-                $request->clientSecret,
-                $request->clientAdminEmail,
-                $request->clientAdminPassword,
-            );
-            $this->tokenStore->storeMerchantToken($request->clientId, $merchantToken);
-        }
-
-        // ── Step 2: sign up customer → clientUserToken (opaque) ────────────
-        // clientUserId falls back to the phone (digits only) so sign-up and login
-        // always use the same identifier for the same buyer.
-        $clientUserId = $request->customer->clientUserId
-            ?? PhoneNumber::toClientUserId($request->customer->phoneNumber);
-
-        $clientUserToken = $this->signUpCustomer(
-            $appToken,
-            $clientUserId,
-            $request->customer->phoneNumber,
-            $request->customer->firstName,
-            $request->customer->lastName,
-        );
-
-        // ── Step 3: customer login → customerToken (JWT) ───────────────────
-        // Uses phone as username and clientUserToken (from step 2) as password.
-        $customerToken = $this->fetchCustomerToken(
+        $appToken = $this->ensureAppToken(
             $request->clientId,
             $request->clientSecret,
-            $request->customer->phoneNumber,
-            $clientUserToken,
+            $useCachedTokens,
         );
-        $this->tokenStore->storeCustomerToken($clientUserId, $customerToken);
+
+        $merchantToken = $this->ensureMerchantToken(
+            $request->clientId,
+            $request->clientSecret,
+            $request->clientAdminEmail,
+            $request->clientAdminPassword,
+            $useCachedTokens,
+        );
+
+        // ── Steps 2–3: buyer sign-up + login → customerToken (JWT) ─────────
+        // Served from cache when the buyer already has a live token — typically
+        // minted when they logged into the storefront, so checkout does no auth
+        // work at all. Only a cache miss pays for the two round trips.
+        $customerToken = $this->ensureCustomerToken(
+            $request->clientId,
+            $request->clientSecret,
+            $request->customer,
+            appToken: $appToken,
+            useCache: $useCachedTokens,
+        );
 
         // ── Step 4: create contract ─────────────────────────────────────────
         $contractId = $this->createContract($merchantToken, $request->product);
@@ -149,6 +186,153 @@ class EcomCheckoutOrchestrator
             contractId: $contractId,
             milestoneId: $milestoneId,
         );
+    }
+
+    // ── Token warm-up (off the checkout path) ─────────────────────────────────
+
+    /**
+     * Refresh the merchant-scoped tokens (app + merchant) if either is missing or
+     * about to expire. Both are shared per clientId, so one warm-up serves every
+     * shopper on the store.
+     *
+     * Designed to be called on a schedule (Magento cron, WP-Cron) and right after
+     * a merchant saves their credentials. It is a no-op when both tokens still
+     * have more than $leewaySeconds of life, so a frequent tick costs nothing but
+     * two cache reads. PHP has no process that stays alive between requests, so a
+     * recurring tick is the closest thing to "fetch these once when the server
+     * comes up" — and unlike a bootstrap hook it refreshes *ahead* of expiry
+     * instead of making some unlucky shopper's request pay for it.
+     *
+     * The lazy fetch inside initiateCheckout() remains the backstop: if the
+     * schedule is not running at all, checkout still works, just slower.
+     *
+     * @return string[] Tokens actually refreshed: any of 'app', 'merchant'.
+     *                  An empty array means both were still valid.
+     *
+     * @throws AuthException When Waffy rejects the credentials.
+     */
+    public function warmMerchantTokens(
+        string $clientId,
+        string $clientSecret,
+        string $clientAdminEmail,
+        string $clientAdminPassword,
+        int $leewaySeconds = self::WARMUP_LEEWAY_SECONDS,
+    ): array {
+        $refreshed = [];
+
+        if (!$this->isTokenValid($this->tokenStore->getAppToken($clientId), $leewaySeconds)) {
+            $this->tokenStore->storeAppToken($clientId, $this->fetchAppToken($clientId, $clientSecret));
+            $refreshed[] = 'app';
+        }
+
+        if (!$this->isTokenValid($this->tokenStore->getMerchantToken($clientId), $leewaySeconds)) {
+            $this->tokenStore->storeMerchantToken(
+                $clientId,
+                $this->fetchMerchantToken($clientId, $clientSecret, $clientAdminEmail, $clientAdminPassword),
+            );
+            $refreshed[] = 'merchant';
+        }
+
+        return $refreshed;
+    }
+
+    /**
+     * Return a usable customer token for $customer, minting one (sign-up + password
+     * grant) only when the cache has nothing valid.
+     *
+     * Two callers, one code path:
+     *   - checkout, where it is the buyer's token for the Waffy payment page;
+     *   - the storefront login / first-page-view prefetch, which just wants the
+     *     token in the cache before the buyer reaches checkout.
+     *
+     * Calling it repeatedly for the same buyer is cheap and harmless — a warm cache
+     * short-circuits before any HTTP happens, which is what makes it safe to hang
+     * off a login hook. Note that sign-up (step 2) creates a real Waffy user, so
+     * only call this for a buyer you actually have an E.164 phone number for; never
+     * speculatively for anonymous traffic.
+     *
+     * @param string|null $appToken Reuse an app token the caller already has;
+     *                              fetched (and cached) on demand when null.
+     * @param bool        $useCache Pass false to force a fresh mint — used by the
+     *                              401/403 retry, where the cached token is suspect.
+     *
+     * @throws AuthException When sign-up or the buyer's password grant fails.
+     */
+    public function ensureCustomerToken(
+        string $clientId,
+        string $clientSecret,
+        CustomerInfo $customer,
+        ?string $appToken = null,
+        bool $useCache = true,
+        int $leewaySeconds = self::CUSTOMER_LEEWAY_SECONDS,
+    ): string {
+        $clientUserId = $customer->resolveClientUserId();
+
+        if ($useCache) {
+            $cached = $this->tokenStore->getCustomerToken($clientUserId);
+            if ($cached !== null && $this->isTokenValid($cached, $leewaySeconds)) {
+                return $cached;
+            }
+        }
+
+        // Step 2 — sign up (idempotent: an existing buyer still gets a token back).
+        $clientUserToken = $this->signUpCustomer(
+            $appToken ?? $this->ensureAppToken($clientId, $clientSecret, $useCache),
+            $clientUserId,
+            $customer->phoneNumber,
+            $customer->firstName,
+            $customer->lastName,
+        );
+
+        // Step 3 — buyer password grant, using the opaque step-2 token as password.
+        $customerToken = $this->fetchCustomerToken(
+            $clientId,
+            $clientSecret,
+            $customer->phoneNumber,
+            $clientUserToken,
+        );
+
+        $this->tokenStore->storeCustomerToken($clientUserId, $customerToken);
+
+        return $customerToken;
+    }
+
+    /** Cached-or-fetched app token (step 1a). @throws AuthException */
+    private function ensureAppToken(
+        string $clientId,
+        string $clientSecret,
+        bool $useCache,
+        int $leewaySeconds = self::CHECKOUT_LEEWAY_SECONDS,
+    ): string {
+        $cached = $useCache ? $this->tokenStore->getAppToken($clientId) : null;
+        if ($cached !== null && $this->isTokenValid($cached, $leewaySeconds)) {
+            return $cached;
+        }
+
+        $token = $this->fetchAppToken($clientId, $clientSecret);
+        $this->tokenStore->storeAppToken($clientId, $token);
+
+        return $token;
+    }
+
+    /** Cached-or-fetched merchant token (step 1b). @throws AuthException */
+    private function ensureMerchantToken(
+        string $clientId,
+        string $clientSecret,
+        string $clientAdminEmail,
+        string $clientAdminPassword,
+        bool $useCache,
+        int $leewaySeconds = self::CHECKOUT_LEEWAY_SECONDS,
+    ): string {
+        $cached = $useCache ? $this->tokenStore->getMerchantToken($clientId) : null;
+        if ($cached !== null && $this->isTokenValid($cached, $leewaySeconds)) {
+            return $cached;
+        }
+
+        $token = $this->fetchMerchantToken($clientId, $clientSecret, $clientAdminEmail, $clientAdminPassword);
+        $this->tokenStore->storeMerchantToken($clientId, $token);
+
+        return $token;
     }
 
     // ── Flow steps & helpers ──────────────────────────────────────────────────
@@ -457,10 +641,14 @@ class EcomCheckoutOrchestrator
     // ── Token helpers ────────────────────────────────────────────────────────
 
     /**
-     * Returns true if $jwt is a non-expired JWT with at least 60 seconds left.
+     * Returns true if $jwt is a JWT with at least $leewaySeconds of life left.
      * Parses the `exp` claim from the payload segment without a JWT library.
+     *
+     * The leeway is the caller's call: a token only used server-side within this
+     * request needs seconds, one handed to the buyer needs minutes, and a warm-up
+     * refreshing ahead of expiry needs longer than its own tick interval.
      */
-    private function isTokenValid(?string $jwt): bool
+    private function isTokenValid(?string $jwt, int $leewaySeconds = self::CHECKOUT_LEEWAY_SECONDS): bool
     {
         if ($jwt === null || $jwt === '') {
             return false;
@@ -483,8 +671,7 @@ class EcomCheckoutOrchestrator
             return false;
         }
 
-        // 60-second safety buffer to avoid using a token that expires mid-request
-        return (int) $payload['exp'] > (time() + 60);
+        return (int) $payload['exp'] > (time() + $leewaySeconds);
     }
 
     /**

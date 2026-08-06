@@ -20,4 +20,11 @@ enum OrderAction
 
     /** Payment is secured in escrow — move the order to its "paid/processing" state. */
     case MARK_PAYMENT_SECURED;
+
+    /**
+     * Escrow settled — the merchant's cash-out is approved and funds are released.
+     * The transaction is fully done; move the order to its terminal "completed"
+     * state. Adapters must not downgrade an order that is already completed.
+     */
+    case MARK_COMPLETED;
 }

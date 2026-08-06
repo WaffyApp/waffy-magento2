@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waffy\Ecommerce\Dto;
 
 use Waffy\Ecommerce\Exception\ValidationException;
+use Waffy\Ecommerce\Support\PhoneNumber;
 
 /**
  * A participant in a milestone contract.
@@ -30,7 +31,7 @@ readonly class Party
                 sprintf('Party role must be one of %s, got "%s".', implode(', ', self::VALID_ROLES), $role),
             );
         }
-        if (!preg_match('/^\+\d{8,15}$/', $phoneNumber)) {
+        if (!PhoneNumber::isValidE164($phoneNumber)) {
             throw new ValidationException(
                 sprintf('Party phoneNumber must be E.164, got "%s".', $phoneNumber),
             );

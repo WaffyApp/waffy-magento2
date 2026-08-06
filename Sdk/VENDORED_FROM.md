@@ -9,8 +9,8 @@ Make the change in `waffy-ecom-sdk-php`, commit it there, then run
 `dev/sync-sdk.sh` to regenerate this folder.
 
 - Source: https://github.com/WaffyApp/waffy-ecom-sdk-php
-- Synced from: `v0.1.1-2-g72c7ff7` (commit `72c7ff7-dirty`)
-- Synced on: 2026-07-28
+- Synced from: `v0.1.1-6-ga3df84f` (commit `a3df84f-dirty`)
+- Synced on: 2026-08-05
 - Namespace: `Waffy\Ecommerce\` (unchanged — mapped via this module's
   `composer.json` psr-4 autoload, so all `use` statements work unmodified)
 - Transform: none. This is a byte-for-byte copy of the SDK `src/`. If Magento

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+    Token warm-up schedule.
+
+    Every 15 minutes, well inside the SDK's WARMUP_LEEWAY_SECONDS (1800), so a
+    token is always renewed before it can expire on a shopper's request. The job
+    is a no-op when both tokens are still fresh.
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Cron:etc/crontab.xsd">
+    <group id="default">
+        <job name="waffy_refresh_tokens"
+             instance="Waffy\Payment\Cron\RefreshTokens"
+             method="execute">
+            <schedule>*/15 * * * *</schedule>
+        </job>
+    </group>
+</config>

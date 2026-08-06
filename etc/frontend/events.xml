@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!--
+    Storefront triggers for the customer-token prefetch. Frontend area only —
+    there is no shopper to warm a token for in the admin or in a cron process.
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+
+    <!-- The shopper just signed in. -->
+    <event name="customer_login">
+        <observer name="waffy_prefetch_customer_token_on_login"
+                  instance="Waffy\Payment\Observer\PrefetchCustomerTokenOnLogin"/>
+    </event>
+
+    <!-- …or arrived with a session cookie already set, which never fires customer_login. -->
+    <event name="controller_action_predispatch">
+        <observer name="waffy_prefetch_customer_token_on_visit"
+                  instance="Waffy\Payment\Observer\PrefetchCustomerTokenOnVisit"/>
+    </event>
+
+</config>

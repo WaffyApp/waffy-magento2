@@ -79,6 +79,25 @@ See [INSTALL.md](INSTALL.md) for the detailed walkthrough and go-live steps.
 3. Waffy notifies your store as the payment is secured and later released, and
    the Magento order status updates automatically.
 
+### Token warm-up
+
+Checkout needs four OAuth tokens. All are cached (encrypted) in `waffy_token` and
+reused until they near expiry, and the module keeps that cache warm so checkout
+does no auth work:
+
+- **Store tokens (app + merchant).** The `waffy_refresh_tokens` cron job runs every
+  15 minutes per active store and renews either token that is within 30 minutes of
+  expiring — a no-op otherwise. Also primed when the payment configuration is
+  saved. **This requires Magento cron to be running**; if it is not, checkout
+  still works, it just fetches the tokens itself the first time.
+- **Buyer token.** Minted on `customer_login`, and on the first storefront page of
+  a session for a customer who arrived already logged in. Requires a telephone on
+  the customer's default billing address; guests are never signed up
+  speculatively. The work is deferred until after the response is sent
+  (`Model\AfterResponse`), so shoppers never wait for it.
+
+Failures are logged (`var/log/system.log`) and never surfaced to a shopper.
+
 ## Support
 
 - 📧 **support@waffyapp.com**

@@ -35,6 +35,29 @@ readonly class WebhookOutcome
         $ref = $event->referenceId !== '' ? ' (ref: ' . $event->referenceId . ')' : '';
 
         return match ($event->status) {
+            // ── Confirmed live statuses (2026-08-03) ────────────────────────
+            // Funds are secured in escrow — the merchant should start fulfilling.
+            WebhookStatus::PARTIALLY_PAID => new self(
+                OrderAction::MARK_PAYMENT_SECURED,
+                'Waffy: payment secured in escrow (PARTIALLY_PAID). Milestone: ' . $event->contractId . $ref,
+                'Your payment has been received and secured.',
+            ),
+            // Buyer accepted the delivered item; funds will be released. The order
+            // is already Processing from PARTIALLY_PAID, so record a note only.
+            // TBD(backend): confirm whether a distinct "completed/released" status
+            // follows, and whether ITEM_ACCEPTED should complete the order.
+            WebhookStatus::ITEM_ACCEPTED => new self(
+                OrderAction::NONE,
+                'Waffy: buyer accepted the item (ITEM_ACCEPTED)' . $ref . '.',
+                'You have accepted the item. Thank you!',
+            ),
+            // Settlement done — merchant paid out. Terminal success → complete the order.
+            WebhookStatus::CASH_OUT_APPROVED => new self(
+                OrderAction::MARK_COMPLETED,
+                'Waffy: settlement complete, funds released to merchant (CASH_OUT_APPROVED). Milestone: ' . $event->contractId . $ref,
+                'Your order is complete.',
+            ),
+
             WebhookStatus::CREATED => new self(
                 OrderAction::NONE,
                 'Waffy: contract created' . $ref . '.',

@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!--
+    Prime the token cache the moment the merchant finishes (or changes) their
+    Waffy setup, so the first checkout does not have to fetch anything.
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="admin_system_config_changed_section_payment">
+        <observer name="waffy_prime_tokens_on_config_save"
+                  instance="Waffy\Payment\Observer\PrimeTokensOnConfigSave"/>
+    </event>
+</config>

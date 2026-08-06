@@ -8,6 +8,7 @@ use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\FlagManager;
 use Psr\Log\LoggerInterface;
 use Waffy\Ecommerce\Dto\CustomerInfo;
 use Waffy\Ecommerce\Exception\ValidationException;
@@ -47,11 +48,15 @@ class TokenWarmer
     /** Back-off after a failed prefetch, so a broken backend is not retried per page view. */
     private const PREFETCH_RETRY_AFTER = 900;
 
+    /** Flag holding a hash of the credentials the cached tokens were minted under. */
+    private const FLAG_CREDENTIALS_HASH = 'waffy_credentials_hash';
+
     public function __construct(
         private readonly Config $config,
         private readonly OrchestratorFactory $orchestratorFactory,
         private readonly TokenStore $tokenStore,
         private readonly CustomerRepositoryInterface $customerRepository,
+        private readonly FlagManager $flagManager,
         private readonly LoggerInterface $logger,
     ) {}
 
@@ -100,14 +105,37 @@ class TokenWarmer
     }
 
     /**
-     * Discard the whole token cache. Called when the payment configuration is
-     * saved: tokens minted under different credentials (or in the other
-     * environment) are not merely stale but wrong, and the SDK only checks
-     * expiry, not identity, so nothing else would notice.
+     * Drop the token cache if — and only if — the credentials it was minted under
+     * have changed.
+     *
+     * Tokens issued to a different Waffy client (or in the other environment) are
+     * not merely stale but wrong, and the SDK only validates expiry, not identity,
+     * so nothing else would catch them. The identity check matters because the
+     * triggering event fires for *any* payment-section save: a merchant editing an
+     * unrelated payment method must not cost every buyer their cached token.
+     *
+     * Only a hash is stored, never the credentials.
+     *
+     * @return bool True when the cache was dropped.
      */
-    public function flushCache(): void
+    public function flushCacheIfCredentialsChanged(?int $storeId = null): bool
     {
+        $hash = hash('sha256', implode('|', [
+            $this->config->getEnvironment($storeId),
+            $this->config->getClientId($storeId),
+            $this->config->getClientSecret($storeId),
+            $this->config->getClientAdminEmail($storeId),
+            $this->config->getClientAdminPassword($storeId),
+        ]));
+
+        if ((string) $this->flagManager->getFlagData(self::FLAG_CREDENTIALS_HASH) === $hash) {
+            return false;
+        }
+
         $this->tokenStore->flush();
+        $this->flagManager->saveFlag(self::FLAG_CREDENTIALS_HASH, $hash);
+
+        return true;
     }
 
     // ── Customer token ───────────────────────────────────────────────────────

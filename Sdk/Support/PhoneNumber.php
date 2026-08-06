@@ -53,6 +53,22 @@ class PhoneNumber
     }
 
     /**
+     * True when $candidate is already a valid E.164 number in the exact shape the
+     * Waffy API accepts: a leading "+" followed by 8–15 digits.
+     *
+     * This is the single validity rule enforced by {@see \Waffy\Ecommerce\Dto\CustomerInfo}
+     * and {@see \Waffy\Ecommerce\Dto\Party}; it is exposed here so storefront
+     * adapters can pre-validate the buyer's number at checkout (before an order is
+     * created) instead of re-deriving the regex. Note that {@see toE164()} only
+     * *normalises* — it will happily return "+966abc" for junk input — so callers
+     * that need a yes/no answer should chain: `isValidE164(toE164($raw))`.
+     */
+    public static function isValidE164(string $candidate): bool
+    {
+        return (bool) preg_match('/^\+\d{8,15}$/', $candidate);
+    }
+
+    /**
      * Derive the stable Waffy identity key for a buyer from their E.164 number:
      * the digits with the leading "+" removed. This is the identifier used for
      * sign-up, login and the customer-token cache key, so sign-up and login
