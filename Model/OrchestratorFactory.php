@@ -26,4 +26,20 @@ class OrchestratorFactory
             tokenStore:  $this->tokenStore,
         );
     }
+
+    /**
+     * Same orchestrator on a tighter HTTP budget, for TokenWarmer's cron refresh
+     * and login prefetch. Those paths would rather skip a refresh than hold a
+     * PHP-FPM worker; checkout would rather wait than lose the order. Both budgets
+     * are defined by the SDK.
+     */
+    public function createWarm(?int $storeId = null): EcomCheckoutOrchestrator
+    {
+        return new EcomCheckoutOrchestrator(
+            authBaseUrl: $this->config->getAuthBaseUrl($storeId),
+            apiBaseUrl:  $this->config->getApiBaseUrl($storeId),
+            tokenStore:  $this->tokenStore,
+            httpClient:  EcomCheckoutOrchestrator::warmHttpClient(),
+        );
+    }
 }

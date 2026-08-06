@@ -53,6 +53,20 @@ class TokenStore implements TokenStoreInterface
         return $this->fetch('customer', $clientUserId);
     }
 
+    /**
+     * Drop every cached token.
+     *
+     * Used when the merchant's credentials change: those tokens belong to a
+     * different Waffy client, and since the SDK only validates expiry it would
+     * happily keep using them. Cheap to throw away — the warm-up and the next
+     * checkout mint replacements.
+     */
+    public function flush(): void
+    {
+        $conn = $this->connection->getConnection();
+        $conn->delete($this->connection->getTableName(self::TABLE));
+    }
+
     private function upsert(string $type, string $id, string $token): void
     {
         $conn = $this->connection->getConnection();
