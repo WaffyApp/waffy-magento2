@@ -10,6 +10,7 @@ use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use JsonException;
+use Waffy\Ecommerce\Contract\ProgressReporter;
 use Waffy\Ecommerce\Contract\TokenStore;
 use Waffy\Ecommerce\Dto\CheckoutRequest;
 use Waffy\Ecommerce\Dto\CheckoutResult;
@@ -19,6 +20,8 @@ use Waffy\Ecommerce\Dto\Party;
 use Waffy\Ecommerce\Dto\ProductInfo;
 use Waffy\Ecommerce\Exception\ApiException;
 use Waffy\Ecommerce\Exception\AuthException;
+use Waffy\Ecommerce\Progress\CheckoutStep;
+use Waffy\Ecommerce\Progress\StepStatus;
 
 /**
  * Orchestrates the 7-step Waffy checkout flow and returns a CheckoutResult.
@@ -77,6 +80,7 @@ class EcomCheckoutOrchestrator
         private readonly string $apiBaseUrl,
         private readonly TokenStore $tokenStore,
         ?ClientInterface $httpClient = null,
+        private readonly ?ProgressReporter $progress = null,
     ) {
         $this->http = $httpClient ?? new GuzzleClient([
             'timeout'         => 30.0,
@@ -162,22 +166,39 @@ class EcomCheckoutOrchestrator
             useCache: $useCachedTokens,
         );
 
-        // ── Step 4: create contract ─────────────────────────────────────────
-        $contractId = $this->createContract($merchantToken, $request->product);
+        // ── Steps 4–7: the contract itself ──────────────────────────────────
+        // Never cacheable: every order is a new contract, so these four always run.
 
-        // ── Step 5: create milestone ────────────────────────────────────────
-        $milestoneId = $this->createMilestone($merchantToken, $contractId, $request->product, $request->milestone);
+        $contractId = $this->tracked(
+            CheckoutStep::CreateContract,
+            fn(): string => $this->createContract($merchantToken, $request->product),
+        );
 
-        // ── Step 6: add parties ─────────────────────────────────────────────
-        $this->addParties($merchantToken, $contractId, $milestoneId, $request->parties);
+        $milestoneId = $this->tracked(
+            CheckoutStep::CreateMilestone,
+            fn(): string => $this->createMilestone($merchantToken, $contractId, $request->product, $request->milestone),
+        );
 
-        // ── Step 7: get payment URL ─────────────────────────────────────────
-        $paymentUrl = $this->startPayment(
-            $merchantToken,
-            $milestoneId,
-            $request->clientId,
-            $request->redirectUrl,
-            $request->paymentType,
+        $this->tracked(
+            CheckoutStep::AddParties,
+            // addParties() returns nothing; the closure yields a value so the
+            // generic tracked() helper has something to hand back.
+            function () use ($merchantToken, $contractId, $milestoneId, $request): bool {
+                $this->addParties($merchantToken, $contractId, $milestoneId, $request->parties);
+
+                return true;
+            },
+        );
+
+        $paymentUrl = $this->tracked(
+            CheckoutStep::StartPayment,
+            fn(): string => $this->startPayment(
+                $merchantToken,
+                $milestoneId,
+                $request->clientId,
+                $request->redirectUrl,
+                $request->paymentType,
+            ),
         );
 
         return new CheckoutResult(
@@ -220,16 +241,23 @@ class EcomCheckoutOrchestrator
     ): array {
         $refreshed = [];
 
-        if (!$this->isTokenValid($this->tokenStore->getAppToken($clientId), $leewaySeconds)) {
-            $this->tokenStore->storeAppToken($clientId, $this->fetchAppToken($clientId, $clientSecret));
+        if ($this->isTokenValid($this->tokenStore->getAppToken($clientId), $leewaySeconds)) {
+            $this->reportCached(CheckoutStep::AppToken);
+        } else {
+            $this->tokenStore->storeAppToken($clientId, $this->tracked(
+                CheckoutStep::AppToken,
+                fn(): string => $this->fetchAppToken($clientId, $clientSecret),
+            ));
             $refreshed[] = 'app';
         }
 
-        if (!$this->isTokenValid($this->tokenStore->getMerchantToken($clientId), $leewaySeconds)) {
-            $this->tokenStore->storeMerchantToken(
-                $clientId,
-                $this->fetchMerchantToken($clientId, $clientSecret, $clientAdminEmail, $clientAdminPassword),
-            );
+        if ($this->isTokenValid($this->tokenStore->getMerchantToken($clientId), $leewaySeconds)) {
+            $this->reportCached(CheckoutStep::MerchantToken);
+        } else {
+            $this->tokenStore->storeMerchantToken($clientId, $this->tracked(
+                CheckoutStep::MerchantToken,
+                fn(): string => $this->fetchMerchantToken($clientId, $clientSecret, $clientAdminEmail, $clientAdminPassword),
+            ));
             $refreshed[] = 'merchant';
         }
 
@@ -271,25 +299,38 @@ class EcomCheckoutOrchestrator
         if ($useCache) {
             $cached = $this->tokenStore->getCustomerToken($clientUserId);
             if ($cached !== null && $this->isTokenValid($cached, $leewaySeconds)) {
+                // One cache hit skips both buyer calls, so both are reported —
+                // the display should show two steps satisfied, not one.
+                $this->reportCached(CheckoutStep::CustomerSignUp);
+                $this->reportCached(CheckoutStep::CustomerToken);
+
                 return $cached;
             }
         }
 
         // Step 2 — sign up (idempotent: an existing buyer still gets a token back).
-        $clientUserToken = $this->signUpCustomer(
-            $appToken ?? $this->ensureAppToken($clientId, $clientSecret, $useCache),
-            $clientUserId,
-            $customer->phoneNumber,
-            $customer->firstName,
-            $customer->lastName,
+        $appToken ??= $this->ensureAppToken($clientId, $clientSecret, $useCache);
+
+        $clientUserToken = $this->tracked(
+            CheckoutStep::CustomerSignUp,
+            fn(): string => $this->signUpCustomer(
+                $appToken,
+                $clientUserId,
+                $customer->phoneNumber,
+                $customer->firstName,
+                $customer->lastName,
+            ),
         );
 
         // Step 3 — buyer password grant, using the opaque step-2 token as password.
-        $customerToken = $this->fetchCustomerToken(
-            $clientId,
-            $clientSecret,
-            $customer->phoneNumber,
-            $clientUserToken,
+        $customerToken = $this->tracked(
+            CheckoutStep::CustomerToken,
+            fn(): string => $this->fetchCustomerToken(
+                $clientId,
+                $clientSecret,
+                $customer->phoneNumber,
+                $clientUserToken,
+            ),
         );
 
         $this->tokenStore->storeCustomerToken($clientUserId, $customerToken);
@@ -306,10 +347,15 @@ class EcomCheckoutOrchestrator
     ): string {
         $cached = $useCache ? $this->tokenStore->getAppToken($clientId) : null;
         if ($cached !== null && $this->isTokenValid($cached, $leewaySeconds)) {
+            $this->reportCached(CheckoutStep::AppToken);
+
             return $cached;
         }
 
-        $token = $this->fetchAppToken($clientId, $clientSecret);
+        $token = $this->tracked(
+            CheckoutStep::AppToken,
+            fn(): string => $this->fetchAppToken($clientId, $clientSecret),
+        );
         $this->tokenStore->storeAppToken($clientId, $token);
 
         return $token;
@@ -326,10 +372,15 @@ class EcomCheckoutOrchestrator
     ): string {
         $cached = $useCache ? $this->tokenStore->getMerchantToken($clientId) : null;
         if ($cached !== null && $this->isTokenValid($cached, $leewaySeconds)) {
+            $this->reportCached(CheckoutStep::MerchantToken);
+
             return $cached;
         }
 
-        $token = $this->fetchMerchantToken($clientId, $clientSecret, $clientAdminEmail, $clientAdminPassword);
+        $token = $this->tracked(
+            CheckoutStep::MerchantToken,
+            fn(): string => $this->fetchMerchantToken($clientId, $clientSecret, $clientAdminEmail, $clientAdminPassword),
+        );
         $this->tokenStore->storeMerchantToken($clientId, $token);
 
         return $token;
@@ -636,6 +687,47 @@ class EcomCheckoutOrchestrator
         }
 
         return $paymentUrl;
+    }
+
+    // ── Progress instrumentation ─────────────────────────────────────────────
+
+    /**
+     * Run one API call, announcing it to the ProgressReporter before and after.
+     *
+     * Failures are reported and then rethrown untouched — the reporter observes
+     * the flow, it never changes it.
+     *
+     * @template T
+     * @param callable():T $call
+     * @return T
+     */
+    private function tracked(CheckoutStep $step, callable $call): mixed
+    {
+        $this->progress?->report($step, StepStatus::Running, 0.0);
+
+        $startedAt = microtime(true);
+
+        try {
+            $result = $call();
+        } catch (\Throwable $e) {
+            $this->progress?->report($step, StepStatus::Failed, $this->elapsedMs($startedAt));
+            throw $e;
+        }
+
+        $this->progress?->report($step, StepStatus::Done, $this->elapsedMs($startedAt));
+
+        return $result;
+    }
+
+    /** Announce a call that did NOT happen because the cache already had a token. */
+    private function reportCached(CheckoutStep $step): void
+    {
+        $this->progress?->report($step, StepStatus::Cached, 0.0);
+    }
+
+    private function elapsedMs(float $startedAt): float
+    {
+        return round((microtime(true) - $startedAt) * 1000, 1);
     }
 
     // ── Token helpers ────────────────────────────────────────────────────────
