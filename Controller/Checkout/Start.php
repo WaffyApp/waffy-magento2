@@ -22,6 +22,7 @@ use Waffy\Ecommerce\Exception\ApiException;
 use Waffy\Ecommerce\Exception\AuthException;
 use Waffy\Ecommerce\Exception\ValidationException;
 use Waffy\Ecommerce\Support\PhoneNumber;
+use Waffy\Payment\Model\CheckoutProgress;
 use Waffy\Payment\Model\Config;
 use Waffy\Payment\Model\OrchestratorFactory;
 
@@ -51,6 +52,7 @@ class Start implements HttpGetActionInterface
         private readonly OrchestratorFactory $orchestratorFactory,
         private readonly OrderRepositoryInterface $orderRepository,
         private readonly LoggerInterface $logger,
+        private readonly CheckoutProgress $progress,
     ) {}
 
     public function execute(): \Magento\Framework\Controller\ResultInterface
@@ -64,6 +66,13 @@ class Start implements HttpGetActionInterface
                 : $this->redirectFactory->create()->setPath('checkout/cart');
         }
 
+        // Observes every Waffy call: writes the timestamped sequence to the log
+        // and publishes live state for the checkout modal to poll.
+        $progress = $this->progress->start(
+            (string) $this->request->getCookie(CheckoutProgress::COOKIE, ''),
+            'checkout'
+        );
+
         try {
             $request = $this->buildCheckoutRequest($order);
 
@@ -73,7 +82,24 @@ class Start implements HttpGetActionInterface
                 'phone'        => $request->customer->phoneNumber,
             ]);
 
-            $result  = $this->orchestratorFactory->create((int) $order->getStoreId())->initiateCheckout($request);
+            // Everything we need from the session has been read, and the Waffy
+            // calls below can take tens of seconds. PHP holds an exclusive lock on
+            // the session file for the whole request, so keeping it open here
+            // would stall every other request from this browser — including the
+            // modal's progress polls, which would then all arrive at the end
+            // instead of live. Release it before the slow part.
+            //
+            // Only on the JSON path: the redirect path still needs the session
+            // afterwards for messageManager to carry its error to the cart page.
+            if ($wantsJson) {
+                $this->checkoutSession->writeClose();
+            }
+
+            $result = $this->orchestratorFactory
+                ->create((int) $order->getStoreId(), $progress)
+                ->initiateCheckout($request);
+
+            $progress->finish(true);
 
             // Mark as pending_payment and store the milestone ID before redirecting.
             $order->setState(Order::STATE_PENDING_PAYMENT)
@@ -83,7 +109,9 @@ class Start implements HttpGetActionInterface
 
             $finalUrl = $result->paymentUrl . '&userTokenUrl=' . urlencode($result->customerToken);
 
-            $this->checkoutSession->setWaffyPaymentUrl($finalUrl);
+            // (The URL used to be stashed on the session here. Nothing ever read
+            // it back, and after writeClose() above the write would not persist
+            // anyway — so it is gone rather than quietly doing nothing.)
 
             if ($wantsJson) {
                 return $this->jsonFactory->create()->setData(['url' => $finalUrl]);
@@ -94,6 +122,8 @@ class Start implements HttpGetActionInterface
             return $redirect;
 
         } catch (AuthException | ApiException | ValidationException $e) {
+            $progress->finish(false);
+
             $this->logger->error('Waffy checkout failed for order #' . $order->getIncrementId(), [
                 'exception'    => $e->getMessage(),
                 'responseBody' => $e->getResponseBody(),

@@ -57,6 +57,7 @@ class TokenWarmer
         private readonly TokenStore $tokenStore,
         private readonly CustomerRepositoryInterface $customerRepository,
         private readonly FlagManager $flagManager,
+        private readonly CheckoutProgress $progress,
         private readonly LoggerInterface $logger,
     ) {}
 
@@ -77,8 +78,12 @@ class TokenWarmer
             return []; // gateway off, or the merchant has not finished setup
         }
 
+        // No browser is watching a cron tick, so the reporter gets no progress
+        // key — it logs the timestamped calls and publishes nothing.
+        $progress = $this->progress->start('', 'warm-up');
+
         try {
-            $refreshed = $this->orchestratorFactory->createWarm($storeId)->warmMerchantTokens(
+            $refreshed = $this->orchestratorFactory->createWarm($storeId, $progress)->warmMerchantTokens(
                 $this->config->getClientId($storeId),
                 $this->config->getClientSecret($storeId),
                 $this->config->getClientAdminEmail($storeId),
@@ -161,7 +166,7 @@ class TokenWarmer
         }
 
         try {
-            $this->orchestratorFactory->createWarm($storeId)->ensureCustomerToken(
+            $this->orchestratorFactory->createWarm($storeId, $this->progress->start('', 'login-prefetch'))->ensureCustomerToken(
                 $this->config->getClientId($storeId),
                 $this->config->getClientSecret($storeId),
                 $customerInfo,

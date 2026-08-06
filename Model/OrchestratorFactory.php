@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waffy\Payment\Model;
 
+use Waffy\Ecommerce\Contract\ProgressReporter;
 use Waffy\Ecommerce\Contract\TokenStore;
 use Waffy\Ecommerce\Orchestrator\EcomCheckoutOrchestrator;
 
@@ -18,12 +19,17 @@ class OrchestratorFactory
         private readonly TokenStore $tokenStore,
     ) {}
 
-    public function create(?int $storeId = null): EcomCheckoutOrchestrator
+    /**
+     * @param ProgressReporter|null $progress Observes each API call — used to log
+     *        the sequence and drive the checkout modal's live display.
+     */
+    public function create(?int $storeId = null, ?ProgressReporter $progress = null): EcomCheckoutOrchestrator
     {
         return new EcomCheckoutOrchestrator(
             authBaseUrl: $this->config->getAuthBaseUrl($storeId),
             apiBaseUrl:  $this->config->getApiBaseUrl($storeId),
             tokenStore:  $this->tokenStore,
+            progress:    $progress,
         );
     }
 
@@ -33,13 +39,14 @@ class OrchestratorFactory
      * PHP-FPM worker; checkout would rather wait than lose the order. Both budgets
      * are defined by the SDK.
      */
-    public function createWarm(?int $storeId = null): EcomCheckoutOrchestrator
+    public function createWarm(?int $storeId = null, ?ProgressReporter $progress = null): EcomCheckoutOrchestrator
     {
         return new EcomCheckoutOrchestrator(
             authBaseUrl: $this->config->getAuthBaseUrl($storeId),
             apiBaseUrl:  $this->config->getApiBaseUrl($storeId),
             tokenStore:  $this->tokenStore,
             httpClient:  EcomCheckoutOrchestrator::warmHttpClient(),
+            progress:    $progress,
         );
     }
 }

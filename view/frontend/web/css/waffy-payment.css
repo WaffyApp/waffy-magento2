@@ -59,10 +59,177 @@
     display: none;
 }
 
+/* Luma puts the modal's bottom padding on .modal-footer, and this modal has no
+   footer (buttons: [] — the Continue button lives in the content). Without this
+   the button sits flush against the bottom edge of the popup.
+   Selectors are qualified with .modal-popup so they outrank Luma's own
+   `.modal-popup .modal-content` rather than tying with it and depending on
+   stylesheet order. */
+.modal-popup.waffy-disclaimer-modal .modal-content {
+    padding-bottom: 3rem;
+}
+
+.modal-popup.waffy-disclaimer-modal .modal-footer {
+    display: none;
+}
+
 .waffy-disclaimer__body {
     margin: 0;
     line-height: 1.6;
     color: #333333;
+}
+
+/* ── Live checkout progress ───────────────────────────────────────────────────
+   Mirrors assets/css/waffy-disclaimer.css in waffy-woocommerce so the two
+   platforms present the same thing; the markup is built in
+   method-renderer/waffy-payment.js. The step list renders in sandbox only. */
+
+.waffy-progress {
+    margin: 1.5rem 0 0;
+}
+
+.waffy-progress__track {
+    position: relative;
+    height: 0.5rem;
+    overflow: hidden;
+    background: #e8edf6;
+    border-radius: 999px;
+}
+
+.waffy-progress__fill {
+    width: 0;
+    height: 100%;
+    background: #0D44AD;
+    border-radius: inherit;
+    transition: width 0.35s ease;
+}
+
+.waffy-progress__percent {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #0D44AD;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.waffy-progress__note {
+    margin: 0.9rem 0 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8a94a6;
+}
+
+.waffy-progress__steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.85rem;
+}
+
+/* Luma styles bare <li>; reset what it adds so rows sit tight. */
+.waffy-progress__steps > li {
+    margin: 0;
+}
+
+.waffy-progress__step {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.28rem 0;
+    color: #8a94a6;
+    transition: color 0.2s ease;
+}
+
+/* One element, four states — rows never reflow as their status changes. */
+.waffy-progress__mark {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    border: 2px solid #d4dae6;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.waffy-progress__label {
+    flex: 1 1 auto;
+}
+
+.waffy-progress__timing {
+    flex: 0 0 auto;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: #a3abb9;
+}
+
+.waffy-progress__step.is-running {
+    color: #0D44AD;
+    font-weight: 600;
+}
+
+.waffy-progress__step.is-running .waffy-progress__mark {
+    border-color: #c3d0ea;
+    border-top-color: #0D44AD;
+    animation: waffy-spin 0.7s linear infinite;
+}
+
+.waffy-progress__step.is-done,
+.waffy-progress__step.is-cached {
+    color: #1f2937;
+}
+
+.waffy-progress__step.is-done .waffy-progress__mark,
+.waffy-progress__step.is-cached .waffy-progress__mark {
+    border-color: #16a34a;
+    background: #16a34a;
+    color: #ffffff;
+}
+
+.waffy-progress__step.is-done .waffy-progress__mark:before,
+.waffy-progress__step.is-cached .waffy-progress__mark:before {
+    content: '✓';
+}
+
+/* A cached step is a call that never happened — satisfied, but distinct from
+   one we actually made. */
+.waffy-progress__step.is-cached .waffy-progress__mark {
+    border-color: #94a3b8;
+    background: #94a3b8;
+}
+
+.waffy-progress__step.is-cached .waffy-progress__timing {
+    font-style: italic;
+}
+
+.waffy-progress__step.is-failed {
+    color: #b91c1c;
+}
+
+.waffy-progress__step.is-failed .waffy-progress__mark {
+    border-color: #b91c1c;
+    background: #b91c1c;
+    color: #ffffff;
+}
+
+.waffy-progress__step.is-failed .waffy-progress__mark:before {
+    content: '✕';
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .waffy-progress__fill {
+        transition: none;
+    }
+
+    .waffy-progress__step.is-running .waffy-progress__mark {
+        animation: none;
+    }
 }
 
 .waffy-disclaimer__actions {

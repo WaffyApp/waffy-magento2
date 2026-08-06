@@ -6,6 +6,15 @@
     <preference for="Waffy\Ecommerce\Contract\TokenStore"
                 type="Waffy\Payment\Model\TokenStore"/>
 
+    <!-- Publish isSandbox + the progress URL into window.checkoutConfig -->
+    <type name="Magento\Checkout\Model\CompositeConfigProvider">
+        <arguments>
+            <argument name="configProviders" xsi:type="array">
+                <item name="waffy_payment_config_provider" xsi:type="object">Waffy\Payment\Model\CheckoutConfigProvider</item>
+            </argument>
+        </arguments>
+    </type>
+
     <!-- Register CLI commands -->
     <type name="Magento\Framework\Console\CommandList">
         <arguments>

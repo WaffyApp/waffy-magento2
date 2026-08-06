@@ -98,6 +98,45 @@ does no auth work:
 
 Failures are logged (`var/log/system.log`) and never surfaced to a shopper.
 
+### Verifying it: the call log
+
+Every Waffy call is logged with a timestamp, its outcome and how long it took:
+
+```bash
+grep "Waffy: checkout step" var/log/system.log | tail -8
+```
+```
+12:36:09 Waffy: checkout step=app_token        status=cached took=0.0ms
+12:36:09 Waffy: checkout step=merchant_token   status=cached took=0.0ms
+12:36:09 Waffy: checkout step=customer_sign_up status=cached took=0.0ms
+12:36:09 Waffy: checkout step=customer_token   status=cached took=0.0ms
+12:36:15 Waffy: checkout step=create_contract  status=done   took=5884.1ms
+```
+
+`status=cached` means the call **never left the server** — the token was already
+in `waffy_token`. The context says which path made it: `warm-up` (cron),
+`login-prefetch` (customer signed in) or `checkout`. A healthy store shows the
+four auth calls under `warm-up`/`login-prefetch` and only the four contract calls
+under `checkout`.
+
+### Live progress in the checkout modal
+
+The disclaimer modal shows a progress bar that fills as each call completes, fed
+by `GET waffy/checkout/progress` — polled with a key the browser sets as a cookie
+just before the order is placed. In **sandbox** the modal also lists each call
+with a checkmark, a duration, and `cached` against the ones the token cache
+skipped; in **production** only the bar is shown.
+
+Two Magento-specific details make this work:
+
+- **The progress endpoint is session-free.** It reads its key straight off the
+  request cookies and looks state up in the cache — no session, cart or customer.
+- **`Controller\Checkout\Start` closes the session before calling Waffy.** PHP
+  holds an exclusive lock on the session for the whole request, so a checkout
+  taking tens of seconds would stall every other request from that browser and
+  the polls would all arrive at the end. `writeClose()` on the JSON path releases
+  it before the slow work begins.
+
 ## Support
 
 - 📧 **support@waffyapp.com**
