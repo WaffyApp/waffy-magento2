@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!--
+    Storefront-only DI.
+
+    The checkout config provider MUST be declared here rather than in the global
+    etc/di.xml: Magento_Checkout declares CompositeConfigProvider's
+    `configProviders` array in its own frontend-area di.xml, and an area-scoped
+    argument replaces the global one outright instead of merging with it. A
+    global declaration compiles cleanly, passes DI validation, and is then
+    silently absent on the storefront.
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <!-- Publishes isSandbox + the progress URL into window.checkoutConfig -->
+    <type name="Magento\Checkout\Model\CompositeConfigProvider">
+        <arguments>
+            <argument name="configProviders" xsi:type="array">
+                <item name="waffy_payment_config_provider" xsi:type="object">Waffy\Payment\Model\CheckoutConfigProvider</item>
+            </argument>
+        </arguments>
+    </type>
+
+</config>
