@@ -19,6 +19,6 @@ magento-test/
 
 # Build
 node_modules/
-dist/*
-# Release zips are kept in the repo (mirrors waffy-woocommerce/dist).
-!dist/*.zip
+# Release zips are published as GitHub Release assets, never committed —
+# Composer pulls the tag's zipball, so anything here ships to every merchant.
+dist/

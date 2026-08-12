@@ -1,0 +1,16 @@
+# Keep the Composer/Packagist package lean.
+#
+# `composer require waffy/module-payment` downloads GitHub's zipball of the
+# tag, which is the whole tree. Anything marked export-ignore here is stripped
+# from that archive, so it never lands in a merchant's vendor/ directory.
+#
+# This does NOT affect build-package.sh — that lists the shipped paths
+# explicitly when building the Adobe Commerce Marketplace zip.
+
+/dev/               export-ignore
+/dist/              export-ignore
+/.github/           export-ignore
+/build-package.sh   export-ignore
+/DEMO-DEPLOY.md     export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
