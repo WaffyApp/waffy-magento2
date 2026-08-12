@@ -6,6 +6,7 @@ namespace Waffy\Payment\Model;
 
 use Magento\Checkout\Model\ConfigProviderInterface;
 use Magento\Framework\UrlInterface;
+use Waffy\Ecommerce\Branding\Logo;
 
 /**
  * Publishes what the checkout JS needs into window.checkoutConfig.payment.waffy_payment.
@@ -33,6 +34,11 @@ class CheckoutConfigProvider implements ConfigProviderInterface
                 'waffy_payment' => [
                     'isSandbox'   => $this->config->isSandbox(),
                     'progressUrl' => $this->url->getUrl('waffy/checkout/progress'),
+                    // Inline SVG rather than a static URL: the payment method
+                    // template is a Knockout template with no way to resolve a
+                    // view file, and this keeps the logo out of the static
+                    // deploy. Same markup the WooCommerce plugin renders.
+                    'logoSvg'     => Logo::svg(22),
                 ],
             ],
         ];

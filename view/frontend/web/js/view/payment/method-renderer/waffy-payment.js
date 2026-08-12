@@ -76,6 +76,15 @@ define([
         },
 
         /**
+         * Waffy wordmark, inlined by Model\CheckoutConfigProvider from the SDK's
+         * Branding\Logo. Bound with `html:` in the template — static markup we
+         * ship, never anything the buyer or a merchant can influence.
+         */
+        getLogoSvg: function () {
+            return waffyConfig().logoSvg || '';
+        },
+
+        /**
          * Waffy is a redirect method: the real payment URL only exists after the
          * order is placed server-side. We open a disclaimer modal, place the
          * order, and prepare the Waffy link in the background — the modal's

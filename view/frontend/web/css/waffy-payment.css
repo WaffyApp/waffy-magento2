@@ -1,5 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@600&display=swap');
 
+/* Waffy wordmark beside the payment method title. The SVG is inlined by
+   Model\CheckoutConfigProvider from the SDK, so there is no image to size —
+   only the alignment against the label text. */
+.waffy-logo {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+.waffy-logo svg {
+    display: block;
+}
+
 .waffy-btn,
 .waffy-btn:visited,
 .waffy-btn:focus {
