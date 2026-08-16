@@ -1,0 +1,61 @@
+# Publishes the manual-install zip as a GitHub Release asset whenever a
+# version tag is pushed.
+#
+# GitHub attaches "Source code (zip)" / "(tar.gz)" to every release by itself,
+# but those are NOT installable: they wrap everything in a
+# waffy-magento2-<version>/ folder, so unzipping one into app/code/Waffy/Payment
+# leaves Magento unable to find the module. waffy-module-payment-<version>.zip
+# built here is the only correct download.
+#
+#   git tag v0.7.0 && git push origin v0.7.0
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish the module zip
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: json, openssl
+          tools: composer:v2
+
+      # The version lives in two places and they have drifted before
+      # (module.xml sat at 0.5.0 while composer.json said 0.6.0). Fail here
+      # rather than publish a mislabelled artifact.
+      - name: Verify the tag matches the declared version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          COMPOSER="$(php -r 'echo json_decode(file_get_contents("composer.json"))->version;')"
+          MODULE="$(grep -o 'setup_version="[^"]*"' etc/module.xml | cut -d'"' -f2)"
+          echo "tag=$TAG  composer.json=$COMPOSER  etc/module.xml=$MODULE"
+          [ "$TAG" = "$COMPOSER" ] || { echo "::error::tag $TAG does not match composer.json $COMPOSER"; exit 1; }
+          [ "$TAG" = "$MODULE" ]   || { echo "::error::tag $TAG does not match etc/module.xml $MODULE"; exit 1; }
+
+      # build-package.sh derives its file list from git ls-files and fails if a
+      # class wired up in etc/ is missing from the archive.
+      - name: Build the zip
+        run: ./build-package.sh
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ZIP="dist/waffy-module-payment-${VERSION}.zip"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            "${ZIP}#waffy-module-payment-${VERSION}.zip"

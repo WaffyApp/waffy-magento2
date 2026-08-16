@@ -48,7 +48,13 @@ if [ "${#MISSING[@]}" -gt 0 ]; then
   exit 1
 fi
 
-cp "dist/${NAME}" ~/Downloads/
+# Local convenience only. CI runners have no ~/Downloads, and `set -e` would
+# abort the build on the failed copy.
+if [ -d "$HOME/Downloads" ]; then
+  cp "dist/${NAME}" "$HOME/Downloads/"
+  echo "Built dist/${NAME} (copied to ~/Downloads/${NAME})"
+else
+  echo "Built dist/${NAME}"
+fi
 
-echo "Built dist/${NAME} (copied to ~/Downloads/${NAME})"
 unzip -l "dist/${NAME}" | tail -1
