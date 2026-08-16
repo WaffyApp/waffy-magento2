@@ -55,7 +55,14 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           ZIP="dist/waffy-module-payment-${VERSION}.zip"
+
+          # A second, version-less copy. GitHub's /releases/latest/download/<name>
+          # shortcut needs a filename that never changes, so this is what the
+          # website's download button and the docs can link to permanently.
+          cp "$ZIP" "$RUNNER_TEMP/waffy-module-payment.zip"
+
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes \
-            "${ZIP}#waffy-module-payment-${VERSION}.zip"
+            "${ZIP}#waffy-module-payment-${VERSION}.zip" \
+            "$RUNNER_TEMP/waffy-module-payment.zip#waffy-module-payment.zip (permanent link)"
