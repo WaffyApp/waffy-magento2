@@ -22,7 +22,7 @@ NAME="waffy-module-payment-${VERSION}.zip"
 
 # Dev-only paths. Keep in sync with .gitattributes export-ignore, which does
 # the same job for the Composer/Packagist zipball.
-EXCLUDE='^(dev/|dist/|magento-test/|\.github/|\.vscode/|\.idea/|\.gitignore|\.gitattributes|build-package\.sh|DEMO-DEPLOY\.md)'
+EXCLUDE='^(dev/|dist/|marketplace/|magento-test/|\.github/|\.vscode/|\.idea/|\.gitignore|\.gitattributes|build-package\.sh|DEMO-DEPLOY\.md)'
 
 mkdir -p dist
 rm -f "dist/${NAME}"

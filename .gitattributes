@@ -8,6 +8,7 @@
 # explicitly when building the Adobe Commerce Marketplace zip.
 
 /dev/               export-ignore
+/marketplace/       export-ignore
 /dist/              export-ignore
 /.github/           export-ignore
 /build-package.sh   export-ignore

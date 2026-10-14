@@ -1,0 +1,92 @@
+<p>Waffy Escrow Payment lets your shoppers pay through Waffy, an escrow service that holds the buyer's money until the order is confirmed. Instead of funds moving straight from buyer to seller at checkout, Waffy secures them in escrow and releases them to you once the milestone conditions you configure are met — building buyer trust, reducing chargeback exposure, and giving both sides a clear, auditable record of the transaction.</p>
+
+<p>The extension is native, lightweight, and self-contained: the official Waffy PHP SDK is bundled, so a single Composer install pulls in everything the extension needs. It adds Waffy as a payment method on the standard Magento checkout, redirects the shopper to Waffy's secure hosted payment page to pay, and keeps the Magento order in sync automatically through a built-in webhook receiver.</p>
+
+<h2>Features</h2>
+<ul>
+  <li>Escrow-backed checkout — Waffy appears alongside your other payment methods. The buyer pays on Waffy's secure hosted payment page, and funds are held in escrow rather than transferred immediately.</li>
+  <li>Automatic order status updates — a webhook receiver moves the Magento order to Processing when payment is secured in escrow, and to Complete when the escrow is settled and funds are released. No manual reconciliation.</li>
+  <li>Simple admin setup — connect your store with your Waffy API credentials and a Sandbox/Production toggle, entirely from Stores > Configuration > Sales > Payment Methods.</li>
+  <li>Sandbox environment — run complete test orders against Waffy's sandbox before switching a single setting to production.</li>
+  <li>Configurable escrow contracts — set the return policy, who pays the return fee, delivery, inspection and acceptance flags, the milestone deadline in days, and the buyer-facing category.</li>
+  <li>Fast checkout — authentication tokens are cached in encrypted form and refreshed by a background cron job, so the shopper waits on the order call only, not on authentication. A live progress indicator keeps them informed while the escrow contract is created.</li>
+  <li>Multi-store aware — credentials and contract settings are configurable per website and per store view.</li>
+  <li>Observable — every call to Waffy is written to the Magento system log with its outcome and duration, so support questions are answerable from the log alone.</li>
+  <li>Self-contained — the Waffy PHP SDK ships inside the extension. No additional libraries, and no separate service to deploy.</li>
+</ul>
+
+<h2>How it works</h2>
+<ol>
+  <li>The shopper selects Waffy at checkout and places the order. The order is created in Magento with the status Pending Payment. No payment details are requested at this point.</li>
+  <li>The extension creates an escrow contract with Waffy over a server-to-server HTTPS call and receives a payment URL.</li>
+  <li>The shopper's browser is redirected to Waffy's hosted payment page, where they enter their payment details and pay.</li>
+  <li>Waffy holds the funds in escrow and notifies your store. The Magento order moves to Processing.</li>
+  <li>When the escrow is settled and the funds are released to you, Waffy notifies your store again and the order moves to Complete.</li>
+</ol>
+
+<h2>Security</h2>
+
+<h3>Integration method: redirect only</h3>
+<p>This extension uses a full browser redirect to a payment page hosted by Waffy. It does not use a direct-post, an API card-capture, an iframe, a hosted field, or any other embedded payment form, and it offers no alternative payment flow. There is exactly one way for a shopper to pay with this extension, and it takes place on Waffy's domain.</p>
+
+<h3>Where the customer enters payment data</h3>
+<p>On Waffy's hosted payment page, never on the merchant site. The extension's checkout component renders only a radio button, the Waffy logo, a short notice that the shopper will be redirected, and the standard Place Order button. It contains no card number field, no expiry field, no CVV field, and no field of any kind that accepts payment credentials. After the order is placed, the shopper's browser leaves the Magento store entirely and lands on Waffy's payment page, where all payment credentials are entered directly into Waffy's environment.</p>
+
+<h3>Is cardholder data entered into the Magento server? No</h3>
+<p>Cardholder data is never entered on, posted to, passed through, or proxied by the Magento server. No payment credentials reach any Magento controller, model, request, or response at any point in the flow. The Magento server never sees a primary account number (PAN), expiry date, cardholder name as printed on the card, CVV, CVC or CID value, magnetic-stripe data, or PIN data.</p>
+
+<h3>Is cardholder data stored on the Magento server? No</h3>
+<p>Nothing resembling cardholder data is written to the Magento database, the file system, the cache, the session, or the log files, because none of it ever arrives. The extension's only database table, waffy_token, holds Waffy OAuth access tokens and nothing else. Those tokens are encrypted at rest with Magento's own EncryptorInterface (AES-256, keyed by the installation's crypt key), and they are not payment instruments: they cannot be used to charge a card, and they carry no cardholder data.</p>
+
+<h3>PCI DSS scope and SAQ level: SAQ A</h3>
+<p>Because every cardholder-data function — capture, transmission, processing and storage — is fully outsourced to Waffy, and because the merchant's Magento server neither receives nor stores cardholder data, a merchant using this extension for e-commerce payments falls under PCI DSS Self-Assessment Questionnaire A (SAQ A), the shortest validation path available to e-commerce merchants. This is the SAQ level defined for merchants who redirect shoppers to a PCI DSS validated third-party payment page. The extension is designed specifically so that installing it does not push a store into SAQ A-EP or SAQ D: no cardholder data element is ever placed within the merchant's cardholder data environment.</p>
+
+<h3>What the extension does transmit to Waffy</h3>
+<p>To create the escrow contract, the extension sends the order reference, the order total and currency, the item names and quantities, the store name, the escrow contract parameters you configured, and the buyer's first name, last name and mobile number in E.164 format. This is order and contact information required to establish the escrow contract. It contains no cardholder data and no authentication credentials belonging to the shopper.</p>
+
+<h3>Transport security</h3>
+<p>All communication with Waffy — authentication, escrow-contract creation, and the redirect to the payment page — uses HTTPS with TLS certificate verification enabled. Endpoints are fixed to Waffy's own hosts (auth.waffyapp.com and api.waffyapp.com in production, and the equivalent sandbox hosts in sandbox mode). Plain HTTP is not used anywhere in the payment flow.</p>
+
+<h3>Credential storage</h3>
+<p>Your Waffy API Client Secret and account password are stored in Magento's standard encrypted configuration: the fields are declared as obscure and written through Magento's Encrypted backend model, so the values are encrypted at rest in core_config_data and are masked in the admin interface. They are never rendered to the storefront, never exposed in JavaScript, and never written to the log.</p>
+
+<h3>Webhook endpoint hardening</h3>
+<p>The inbound webhook endpoint accepts POST only, and an optional IP allowlist (exact IPv4 or IPv6 addresses, or IPv4 CIDR ranges) restricts which origins may reach it. Non-matching requests are rejected with HTTP 403 before the payload is read. A webhook can only affect the one Magento order whose stored Waffy milestone identifier matches the payload; an unrecognised identifier is rejected and changes nothing. The endpoint moves an order forward through the payment lifecycle only. It cannot capture funds, issue a refund, alter order totals, or modify customer records.</p>
+
+<h3>Logging</h3>
+<p>The extension logs the sequence and outcome of its Waffy calls to Magento's system log for supportability. Those log entries carry no cardholder data, because none exists on the server to log, and API secrets are excluded from them.</p>
+
+<h3>Merchant responsibilities</h3>
+<p>Serve your storefront and checkout over HTTPS, keep Magento and PHP patched, restrict admin access to the payment configuration section to trusted administrators, and complete the PCI DSS SAQ A questionnaire with your acquirer. Contact Waffy at support@waffyapp.com for the current PCI DSS compliance documentation covering Waffy's hosted payment page.</p>
+
+<h2>Compatibility</h2>
+<ul>
+  <li>Adobe Commerce (cloud and on-premises) 2.4.x</li>
+  <li>Magento Open Source 2.4.x</li>
+  <li>Mage-OS</li>
+  <li>PHP 8.1 and later</li>
+</ul>
+
+<h2>Installation</h2>
+<p>Install with Composer, with no access keys required:</p>
+<p>composer require waffy/module-payment<br>
+bin/magento module:enable Waffy_Payment<br>
+bin/magento setup:upgrade<br>
+bin/magento setup:di:compile<br>
+bin/magento cache:flush</p>
+<p>In production mode, also run bin/magento setup:static-content:deploy -f. A full guide covering Adobe Commerce Cloud and manual or offline installation is included with the extension.</p>
+
+<h2>Configuration</h2>
+<p>You will need Waffy API credentials. Contact support@waffyapp.com to obtain them.</p>
+<p>In the Magento admin, go to Stores > Configuration > Sales > Payment Methods > Waffy Escrow Payment, then:</p>
+<ol>
+  <li>Set Environment to Sandbox for testing.</li>
+  <li>Enter your Waffy Client ID, Client Secret, and account email and password.</li>
+  <li>Set your merchant mobile number in E.164 format.</li>
+  <li>Copy the webhook URL shown on the page and send it to the Waffy team so your store can be registered.</li>
+  <li>Adjust the escrow contract settings, set Enabled to Yes, and save the configuration.</li>
+</ol>
+<p>Place a test order and pay with Waffy to confirm the flow end to end, then switch Environment to Production and enter your live credentials to go live.</p>
+
+<h2>Support</h2>
+<p>Email support@waffyapp.com or visit waffyapp.com. Issues can also be reported at github.com/WaffyApp/waffy-magento2/issues.</p>
