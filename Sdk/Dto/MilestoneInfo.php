@@ -21,6 +21,13 @@ use Waffy\Ecommerce\Exception\ValidationException;
 readonly class MilestoneInfo
 {
     /**
+     * Days until the milestone's `deadLine` when the platform does not choose.
+     * Fixed for every storefront until Waffy says what the deadline does —
+     * TBD #21 in project-docs/04-open-questions.md.
+     */
+    public const DEFAULT_DAYS = 30;
+
+    /**
      * @param AddOnFee[] $addOnFees
      */
     public function __construct(
@@ -49,7 +56,7 @@ readonly class MilestoneInfo
      */
     public static function inDays(
         float $amount,
-        int $days,
+        int $days = self::DEFAULT_DAYS,
         string $currency = 'SAR',
         array $addOnFees = [],
         ?\DateTimeImmutable $now = null,

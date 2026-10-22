@@ -6,9 +6,9 @@
 <ul>
   <li>Escrow-backed checkout — Waffy appears alongside your other payment methods. The buyer pays on Waffy's secure hosted payment page, and funds are held in escrow rather than transferred immediately.</li>
   <li>Automatic order status updates — a webhook receiver moves the Magento order to Processing when payment is secured in escrow, and to Complete when the escrow is settled and funds are released. No manual reconciliation.</li>
-  <li>Simple admin setup — connect your store with your Waffy API credentials and a Sandbox/Production toggle, entirely from Stores > Configuration > Sales > Payment Methods.</li>
+  <li>Step-by-step setup — a three-step wizard under Stores > Waffy setup: create your client in the Waffy portal, upload its environment file, and verify. The wizard registers your webhook with Waffy for you.</li>
   <li>Sandbox environment — run complete test orders against Waffy's sandbox before switching a single setting to production.</li>
-  <li>Configurable escrow contracts — set the return policy, who pays the return fee, delivery, inspection and acceptance flags, the milestone deadline in days, and the buyer-facing category.</li>
+  <li>Buyer consent built in — when Waffy needs the shopper's consent, checkout asks for a one-time code sent to their phone, in the same window.</li>
   <li>Fast checkout — authentication tokens are cached in encrypted form and refreshed by a background cron job, so the shopper waits on the order call only, not on authentication. A live progress indicator keeps them informed while the escrow contract is created.</li>
   <li>Multi-store aware — credentials and contract settings are configurable per website and per store view.</li>
   <li>Observable — every call to Waffy is written to the Magento system log with its outcome and duration, so support questions are answerable from the log alone.</li>
@@ -48,7 +48,7 @@
 <p>All communication with Waffy — authentication, escrow-contract creation, and the redirect to the payment page — uses HTTPS with TLS certificate verification enabled. Endpoints are fixed to Waffy's own hosts (auth.waffyapp.com and api.waffyapp.com in production, and the equivalent sandbox hosts in sandbox mode). Plain HTTP is not used anywhere in the payment flow.</p>
 
 <h3>Credential storage</h3>
-<p>Your Waffy API Client Secret and account password are stored in Magento's standard encrypted configuration: the fields are declared as obscure and written through Magento's Encrypted backend model, so the values are encrypted at rest in core_config_data and are masked in the admin interface. They are never rendered to the storefront, never exposed in JavaScript, and never written to the log.</p>
+<p>Your Waffy API Client Secret and admin password are encrypted with Magento's own encryption key before they are stored — in core_config_data once active, and in an encrypted draft while you are still setting up — and the setup wizard never shows them back. They are never rendered to the storefront, never exposed in JavaScript, and never written to the log.</p>
 
 <h3>Webhook endpoint hardening</h3>
 <p>The inbound webhook endpoint accepts POST only, and an optional IP allowlist (exact IPv4 or IPv6 addresses, or IPv4 CIDR ranges) restricts which origins may reach it. Non-matching requests are rejected with HTTP 403 before the payload is read. A webhook can only affect the one Magento order whose stored Waffy milestone identifier matches the payload; an unrecognised identifier is rejected and changes nothing. The endpoint moves an order forward through the payment lifecycle only. It cannot capture funds, issue a refund, alter order totals, or modify customer records.</p>
@@ -77,16 +77,14 @@ bin/magento cache:flush</p>
 <p>In production mode, also run bin/magento setup:static-content:deploy -f. A full guide covering Adobe Commerce Cloud and manual or offline installation is included with the extension.</p>
 
 <h2>Configuration</h2>
-<p>You will need Waffy API credentials. Contact support@waffyapp.com to obtain them.</p>
-<p>In the Magento admin, go to Stores > Configuration > Sales > Payment Methods > Waffy Escrow Payment, then:</p>
+<p>You will need a Waffy organization. The setup wizard links to the Waffy portal, where you create it and an API client for your store.</p>
+<p>In the Magento admin, go to Stores > Waffy setup, then:</p>
 <ol>
-  <li>Set Environment to Sandbox for testing.</li>
-  <li>Enter your Waffy Client ID, Client Secret, and account email and password.</li>
-  <li>Set your merchant mobile number in E.164 format.</li>
-  <li>Copy the webhook URL shown on the page and send it to the Waffy team so your store can be registered.</li>
-  <li>Adjust the escrow contract settings, set Enabled to Yes, and save the configuration.</li>
+  <li>Choose Sandbox for testing and create a client for your store in the Waffy portal.</li>
+  <li>Upload the client's environment file and enter the client secret and admin password.</li>
+  <li>Run the checks: the wizard verifies your credentials, registers your webhook with Waffy, and enables the payment method.</li>
 </ol>
-<p>Place a test order and pay with Waffy to confirm the flow end to end, then switch Environment to Production and enter your live credentials to go live.</p>
+<p>Place a test order and pay with Waffy to confirm the flow end to end, then repeat the setup with Live selected to go live.</p>
 
 <h2>Support</h2>
 <p>Email support@waffyapp.com or visit waffyapp.com. Issues can also be reported at github.com/WaffyApp/waffy-magento2/issues.</p>

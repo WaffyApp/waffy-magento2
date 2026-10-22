@@ -1,0 +1,194 @@
+<?php
+/**
+ * Waffy setup wizard — Stores → Waffy setup.
+ *
+ * @var \Waffy\Payment\Block\Adminhtml\Setup $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+use Waffy\Ecommerce\Config\Environment;
+
+$step        = $block->getStep();
+$environment = $block->getEnvironment();
+$envValue    = $environment->value;
+$formKey     = $block->getFormKey();
+$candidate   = $block->getCandidate();
+$saved       = $block->getSavedFor($environment);
+$checks      = $block->getChecks();
+$tabs        = [
+    1 => __('1 · Create your Waffy client'),
+    2 => __('2 · Connect'),
+    3 => __('3 · Verify & activate'),
+];
+?>
+<div class="waffy-setup">
+    <ul class="waffy-setup__tabs">
+        <?php foreach ($tabs as $number => $label): ?>
+            <li>
+                <a href="<?= $escaper->escapeUrl($block->stepUrl($number)) ?>"
+                   class="<?= $number === $step ? 'current' : '' ?>"
+                   <?= $number === $step ? 'aria-current="step"' : '' ?>><?= $escaper->escapeHtml($label) ?></a>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+
+    <?php if ($environment === Environment::Sandbox): ?>
+        <p class="waffy-setup__banner sandbox"><?= $escaper->escapeHtml(__('SANDBOX values — test payments only')) ?></p>
+    <?php else: ?>
+        <p class="waffy-setup__banner production"><?= $escaper->escapeHtml(__('LIVE values — real payments')) ?></p>
+    <?php endif; ?>
+
+    <?php if ($step === 1): ?>
+        <?php $portal = $environment->portalUrl(); ?>
+        <h2><?= $escaper->escapeHtml(__('Which Waffy environment?')) ?></h2>
+        <div class="waffy-setup__choice">
+            <a class="action-default <?= $environment === Environment::Sandbox ? 'primary' : '' ?>"
+               href="<?= $escaper->escapeUrl($block->stepUrl(1, Environment::Sandbox)) ?>"><?= $escaper->escapeHtml(__('Sandbox (testing)')) ?></a>
+            <a class="action-default <?= $environment === Environment::Production ? 'primary' : '' ?>"
+               href="<?= $escaper->escapeUrl($block->stepUrl(1, Environment::Production)) ?>"><?= $escaper->escapeHtml(__('Live (real payments)')) ?></a>
+        </div>
+        <h2><?= $escaper->escapeHtml(__('Create your Waffy client')) ?></h2>
+        <!-- TBD(waffy): replace with the detailed steps and screenshots for the portal. -->
+        <ol class="waffy-setup__guide">
+            <li><?= $escaper->escapeHtml(__('Open the Waffy portal:')) ?>
+                <a href="<?= $escaper->escapeUrl($portal) ?>" target="_blank" rel="noopener"><?= $escaper->escapeHtml($portal) ?></a></li>
+            <li><?= $escaper->escapeHtml(__('Sign in, and set up your organization if you have not already.')) ?></li>
+            <li><?= $escaper->escapeHtml(__('Create an API client for Magento.')) ?></li>
+            <li><?= $escaper->escapeHtml(__('Download the client\'s env file, and keep its client secret at hand — the file does not include it.')) ?></li>
+        </ol>
+        <a class="action-primary" href="<?= $escaper->escapeUrl($block->stepUrl(2)) ?>"><?= $escaper->escapeHtml(__('I have my client — continue')) ?></a>
+
+    <?php elseif ($step === 2): ?>
+        <?php
+        $secretHint = $saved
+            ? '<p class="note">' . $escaper->escapeHtml(__('Leave blank to keep the saved value (same client only).')) . '</p>'
+            : '';
+        $required = $saved ? '' : ' required';
+        ?>
+        <table class="waffy-setup__hosts">
+            <tr>
+                <th></th>
+                <th><?= $escaper->escapeHtml(__('Sandbox file')) ?> <span class="waffy-badge sandbox">dev / stg</span></th>
+                <th><?= $escaper->escapeHtml(__('Live file')) ?> <span class="waffy-badge production">live</span></th>
+            </tr>
+            <tr><td>Waffy ID</td><td><?= $escaper->escapeHtml(Environment::Sandbox->idBaseUrl()) ?></td><td><?= $escaper->escapeHtml(Environment::Production->idBaseUrl()) ?></td></tr>
+            <tr><td>Auth</td><td><?= $escaper->escapeHtml(Environment::Sandbox->authBaseUrl()) ?></td><td><?= $escaper->escapeHtml(Environment::Production->authBaseUrl()) ?></td></tr>
+            <tr><td>API</td><td><?= $escaper->escapeHtml(Environment::Sandbox->apiBaseUrl()) ?></td><td><?= $escaper->escapeHtml(Environment::Production->apiBaseUrl()) ?></td></tr>
+        </table>
+
+        <div class="waffy-setup__modes" role="tablist">
+            <button type="button" role="tab" data-mode-tab="file"><?= $escaper->escapeHtml(__('Upload env file')) ?></button>
+            <button type="button" role="tab" data-mode-tab="manual"><?= $escaper->escapeHtml(__('Enter manually')) ?></button>
+        </div>
+        <div class="waffy-setup__mode-panels">
+            <form method="post" action="<?= $escaper->escapeUrl($block->getUrl('waffy/setup/connect')) ?>" id="waffy-file-form" data-mode="file">
+                <fieldset class="waffy-setup__box">
+                    <legend class="admin__legend-hidden"><?= $escaper->escapeHtml(__('Upload your env file')) ?></legend>
+                    <!-- TBD(waffy): replace with the detailed steps and screenshots for downloading the env file. -->
+                    <p class="waffy-setup__guide">
+                        <?= $escaper->escapeHtml(__('In the Waffy portal, open your Magento client and download its env file.')) ?>
+                        <a href="<?= $escaper->escapeUrl($environment->portalUrl()) ?>" target="_blank" rel="noopener"><?= $escaper->escapeHtml($environment->portalUrl()) ?></a>
+                    </p>
+                    <input type="hidden" name="form_key" value="<?= $escaper->escapeHtmlAttr($formKey) ?>">
+                    <input type="hidden" name="environment" value="<?= $escaper->escapeHtmlAttr($envValue) ?>">
+                    <input type="hidden" name="mode" value="file">
+                    <textarea name="envJson" id="waffy-env-json" hidden></textarea>
+                    <label for="waffy-env-file"><?= $escaper->escapeHtml(__('Env file (.json)')) ?></label>
+                    <input id="waffy-env-file" type="file" accept=".json,application/json" required>
+                    <div id="waffy-env-preview" class="waffy-setup__preview" aria-live="polite"></div>
+                    <label for="waffy-file-secret"><?= $escaper->escapeHtml(__('Client secret')) ?></label>
+                    <input id="waffy-file-secret" name="clientSecret" type="password" autocomplete="off"<?= $required ?>>
+                    <?= /* @noEscape */ $secretHint ?>
+                    <label for="waffy-file-password"><?= $escaper->escapeHtml(__('Admin password')) ?></label>
+                    <input id="waffy-file-password" name="adminPassword" type="password" autocomplete="off"<?= $required ?>>
+                    <?= /* @noEscape */ $secretHint ?>
+                    <button type="submit" class="action-primary"><?= $escaper->escapeHtml(__('Save')) ?></button>
+                </fieldset>
+            </form>
+
+            <form method="post" action="<?= $escaper->escapeUrl($block->getUrl('waffy/setup/connect')) ?>" data-mode="manual" hidden>
+                <fieldset class="waffy-setup__box">
+                    <legend class="admin__legend-hidden"><?= $escaper->escapeHtml(__('Enter the values')) ?></legend>
+                    <input type="hidden" name="form_key" value="<?= $escaper->escapeHtmlAttr($formKey) ?>">
+                    <input type="hidden" name="environment" value="<?= $escaper->escapeHtmlAttr($envValue) ?>">
+                    <input type="hidden" name="mode" value="manual">
+                    <label for="waffy-client-id"><?= $escaper->escapeHtml(__('Client ID')) ?></label>
+                    <input id="waffy-client-id" name="clientId" required value="<?= $escaper->escapeHtmlAttr($saved?->clientId ?? '') ?>">
+                    <label for="waffy-admin"><?= $escaper->escapeHtml(__('Admin username')) ?></label>
+                    <input id="waffy-admin" name="adminUsername" type="text" required autocapitalize="off" spellcheck="false" placeholder="<?= $escaper->escapeHtmlAttr(__('Mobile or email')) ?>"
+                           value="<?= $escaper->escapeHtmlAttr($saved?->adminUsername ?? '') ?>">
+                    <label for="waffy-account"><?= $escaper->escapeHtml(__('Organization account ID')) ?></label>
+                    <input id="waffy-account" name="orgAccountId" inputmode="numeric" required
+                           value="<?= $escaper->escapeHtmlAttr($saved?->orgAccountId ?? '') ?>">
+                    <label for="waffy-manual-secret"><?= $escaper->escapeHtml(__('Client secret')) ?></label>
+                    <input id="waffy-manual-secret" name="clientSecret" type="password" autocomplete="off"<?= $required ?>>
+                    <?= /* @noEscape */ $secretHint ?>
+                    <label for="waffy-manual-password"><?= $escaper->escapeHtml(__('Admin password')) ?></label>
+                    <input id="waffy-manual-password" name="adminPassword" type="password" autocomplete="off"<?= $required ?>>
+                    <?= /* @noEscape */ $secretHint ?>
+                    <details>
+                        <summary><?= $escaper->escapeHtml(__('Advanced: Waffy addresses')) ?></summary>
+                        <label for="waffy-id-url">Waffy ID URL</label>
+                        <input id="waffy-id-url" name="idBaseUrl" value="<?= $escaper->escapeHtmlAttr($saved?->idBaseUrl ?: $environment->idBaseUrl()) ?>">
+                        <label for="waffy-auth-url">Auth URL</label>
+                        <input id="waffy-auth-url" name="authBaseUrl" value="<?= $escaper->escapeHtmlAttr($saved?->authBaseUrl ?: $environment->authBaseUrl()) ?>">
+                        <label for="waffy-api-url">API URL</label>
+                        <input id="waffy-api-url" name="apiBaseUrl" value="<?= $escaper->escapeHtmlAttr($saved?->apiBaseUrl ?: $environment->apiBaseUrl()) ?>">
+                    </details>
+                    <button type="submit" class="action-primary"><?= $escaper->escapeHtml(__('Save')) ?></button>
+                </fieldset>
+            </form>
+        </div>
+        <script type="text/x-magento-init">
+            <?= /* @noEscape */ json_encode(['*' => ['Waffy_Payment/js/setup' => [
+                'previewUrl'  => $block->getUrl('waffy/setup/envPreview'),
+                'environment' => $envValue,
+                'switchUrls'  => [
+                    'sandbox'    => $block->stepUrl(2, Environment::Sandbox),
+                    'production' => $block->stepUrl(2, Environment::Production),
+                ],
+            ]]], JSON_UNESCAPED_SLASHES) ?>
+        </script>
+
+    <?php else: ?>
+        <?php if ($block->isLive()): ?>
+            <p class="waffy-setup__ok">
+                <?= $escaper->escapeHtml($block->getDraft()
+                    ? __('Waffy is active for this store — the changes below are not active until they pass the checks.')
+                    : __('Waffy is active for this store.')) ?>
+            </p>
+        <?php endif; ?>
+        <?php if ($candidate === null): ?>
+            <p><?= $escaper->escapeHtml(__('Nothing to verify yet.')) ?>
+                <a href="<?= $escaper->escapeUrl($block->stepUrl(2)) ?>"><?= $escaper->escapeHtml(__('Connect your Waffy client first.')) ?></a></p>
+        <?php else: ?>
+            <table class="waffy-setup__summary">
+                <tr><td><?= $escaper->escapeHtml(__('Environment')) ?></td>
+                    <td><span class="waffy-badge <?= $escaper->escapeHtmlAttr($candidate->environment->value) ?>"><?= $escaper->escapeHtml($block->envLabel($candidate->environment)) ?></span></td></tr>
+                <tr><td><?= $escaper->escapeHtml(__('Client ID')) ?></td><td><code><?= $escaper->escapeHtml($candidate->clientId) ?></code></td></tr>
+                <tr><td><?= $escaper->escapeHtml(__('Admin username')) ?></td><td><?= $escaper->escapeHtml($candidate->adminUsername) ?></td></tr>
+                <tr><td><?= $escaper->escapeHtml(__('Organization account')) ?></td>
+                    <td><?= $escaper->escapeHtml($candidate->orgAccountId . ($candidate->organizationCode ? ' (' . $candidate->organizationCode . ')' : '')) ?></td></tr>
+                <tr><td><?= $escaper->escapeHtml(__('Waffy hosts')) ?></td>
+                    <td><small><?= $escaper->escapeHtml($candidate->idBaseUrl) ?><br><?= $escaper->escapeHtml($candidate->authBaseUrl) ?><br><?= $escaper->escapeHtml($candidate->apiBaseUrl) ?></small></td></tr>
+                <tr><td><?= $escaper->escapeHtml(__('Webhook URL')) ?></td><td><code><?= $escaper->escapeHtml($block->getWebhookUrl()) ?></code></td></tr>
+            </table>
+            <?php if ($checks): ?>
+                <ul class="waffy-setup__checks">
+                    <?php foreach ($checks as $check): ?>
+                        <li class="<?= $escaper->escapeHtmlAttr($check['state']) ?>">
+                            <?= $escaper->escapeHtml(__($check['label'])) ?>
+                            <?php if (!empty($check['detail'])): ?>
+                                <span class="detail"><?= $escaper->escapeHtml($check['detail']) ?></span>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+            <form method="post" action="<?= $escaper->escapeUrl($block->getUrl('waffy/setup/verify')) ?>">
+                <input type="hidden" name="form_key" value="<?= $escaper->escapeHtmlAttr($formKey) ?>">
+                <button type="submit" class="action-primary"><?= $escaper->escapeHtml(__('Run checks and activate')) ?></button>
+            </form>
+        <?php endif; ?>
+    <?php endif; ?>
+</div>

@@ -68,21 +68,15 @@ bin/magento module:status Waffy_Payment          # → "Module is enabled"
 
 
 
-## 4. Configure (Admin → Stores → Configuration → Sales → Payment Methods → Waffy Escrow Payment)
+## 4. Set up Waffy (Admin → Stores → Waffy setup)
 
-1. **Environment** = Sandbox
-2. **Sandbox Client ID / Client Secret / Admin Email / Admin Password** — get from
-  the Waffy backend team (these are secrets; do not commit them anywhere)
-3. **Merchant Phone** (E.164, e.g. `+9665XXXXXXXX`)
-4. **Enabled** = Yes → **Save Config** → `bin/magento cache:flush`
-
-
-
-## 5. Register the webhook
-
-Copy the **Webhook URL** shown in that config screen (looks like
-`https://demo.waffyapp.com/waffy/webhook`) and send it to the Waffy team so they
-register the store for order-status callbacks.
+1. Step 1: choose **Sandbox** and create a client for the store in
+   `portal-dev.waffyapp.com`; download its env file.
+2. Step 2: upload the env file and enter the client secret and admin password
+   (secrets — do not commit them anywhere).
+3. Step 3: **Run checks and activate** — this also registers the store's
+   webhook URL (`https://demo.waffyapp.com/waffy/webhook`) with Waffy and
+   enables the payment method.
 
 ## 6. Smoke test
 

@@ -42,6 +42,34 @@ enum Environment: string
     }
 
     /**
+     * Waffy ID (Keycloak) host, used only by organizations on AuthMode::Keycloak.
+     * Legacy organizations never touch it.
+     */
+    public function idBaseUrl(): string
+    {
+        return match ($this) {
+            self::Sandbox => 'https://id-dev.waffyapp.com',
+            // TODO(TBD #16): the production Waffy ID host is unconfirmed — this is
+            // the obvious mirror of the sandbox name, not something the backend team
+            // has stated. Confirm before any production Keycloak org goes live.
+            // See project-docs/04-open-questions.md.
+            self::Production => 'https://id.waffyapp.com',
+        };
+    }
+
+    /**
+     * The Waffy portal where a merchant sets up their organization and creates
+     * the API client (and downloads its env file) for their store.
+     */
+    public function portalUrl(): string
+    {
+        return match ($this) {
+            self::Sandbox    => 'https://portal-dev.waffyapp.com',
+            self::Production => 'https://portal.waffyapp.com',
+        };
+    }
+
+    /**
      * Resolve a stored environment string. Anything other than the explicit
      * 'production' value resolves to Sandbox — going live stays a deliberate act.
      */

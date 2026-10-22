@@ -5,7 +5,6 @@
         <section id="payment">
             <group id="waffy_payment" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Waffy Escrow Payment</label>
-                <comment>Contact Waffy Support Team at support@waffyapp.com to obtain your Client ID and Client Secret.</comment>
 
                 <!-- Waffy wordmark (rendered from the SDK) — banner row, no label -->
                 <field id="logo" translate="label" type="label" sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
@@ -13,150 +12,19 @@
                     <frontend_model>Waffy\Payment\Block\Adminhtml\System\Config\Logo</frontend_model>
                 </field>
 
-                <!-- Webhook URL — copy and share with Waffy team to register this store -->
-                <field id="webhook_url" translate="label comment" type="label" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Webhook URL</label>
-                    <comment><![CDATA[Copy this URL and share it with the Waffy team to register your store's webhook endpoint.]]></comment>
-                    <frontend_model>Waffy\Payment\Block\Adminhtml\System\Config\WebhookUrl</frontend_model>
-                </field>
-                <field id="webhook_allowed_ips" translate="label comment" type="textarea" sortOrder="7" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Webhook Allowed IPs</label>
-                    <comment><![CDATA[One IP or CIDR range per line (e.g. <code>203.0.113.7</code> or <code>203.0.113.0/24</code>). Requests to the webhook from other IPs get 403. <strong>Leave empty to allow all</strong> — ask the Waffy team for their server IPs before restricting.]]></comment>
+                <!-- The Waffy connection is set up in the wizard, not here. -->
+                <field id="setup_status" translate="label" type="label" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Waffy connection</label>
+                    <frontend_model>Waffy\Payment\Block\Adminhtml\System\Config\SetupStatus</frontend_model>
                 </field>
 
-                <!-- Enable / Title -->
-                <field id="active" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
+                <field id="active" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Enabled</label>
+                    <comment>The setup wizard turns this on once your connection passes its checks.</comment>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="title" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Title</label>
-                </field>
-
-                <!-- Environment -->
-                <field id="environment" translate="label comment" type="select" sortOrder="25" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Environment</label>
-                    <comment><![CDATA[<strong>Sandbox</strong> for testing (no real money), <strong>Production</strong> to go live. Each environment has its own credentials below.]]></comment>
-                    <source_model>Waffy\Payment\Model\Config\Source\Environment</source_model>
-                </field>
-
-                <!-- Sandbox credentials -->
-                <field id="sandbox_client_id" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Sandbox Client ID</label>
-                    <comment>Provided by Waffy. Contact support@waffyapp.com to get yours.</comment>
-                    <depends><field id="environment">sandbox</field></depends>
-                </field>
-                <field id="sandbox_client_secret" translate="label comment" type="obscure" sortOrder="31" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Sandbox Client Secret</label>
-                    <comment>Stored encrypted. Never share this value.</comment>
-                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
-                    <depends><field id="environment">sandbox</field></depends>
-                </field>
-                <field id="sandbox_client_admin_email" translate="label comment" type="text" sortOrder="32" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Sandbox Client Admin Email</label>
-                    <comment>Waffy admin account email for your sandbox merchant account.</comment>
-                    <validate>validate-email</validate>
-                    <depends><field id="environment">sandbox</field></depends>
-                </field>
-                <field id="sandbox_client_admin_password" translate="label comment" type="obscure" sortOrder="33" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Sandbox Client Admin Password</label>
-                    <comment>Stored encrypted.</comment>
-                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
-                    <depends><field id="environment">sandbox</field></depends>
-                </field>
-
-                <!-- Production credentials -->
-                <field id="production_client_id" translate="label comment" type="text" sortOrder="34" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Production Client ID</label>
-                    <comment>Provided by Waffy. Contact support@waffyapp.com to get yours.</comment>
-                    <depends><field id="environment">production</field></depends>
-                </field>
-                <field id="production_client_secret" translate="label comment" type="obscure" sortOrder="35" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Production Client Secret</label>
-                    <comment>Stored encrypted. Never share this value.</comment>
-                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
-                    <depends><field id="environment">production</field></depends>
-                </field>
-                <field id="production_client_admin_email" translate="label comment" type="text" sortOrder="36" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Production Client Admin Email</label>
-                    <comment>Waffy admin account email for your production merchant account.</comment>
-                    <validate>validate-email</validate>
-                    <depends><field id="environment">production</field></depends>
-                </field>
-                <field id="production_client_admin_password" translate="label comment" type="obscure" sortOrder="37" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Production Client Admin Password</label>
-                    <comment>Stored encrypted.</comment>
-                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
-                    <depends><field id="environment">production</field></depends>
-                </field>
-
-                <!-- Merchant identity -->
-                <field id="merchant_phone" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Merchant Phone Number</label>
-                    <comment>E.164 format, e.g. +966555555555. Used as the PROVIDER party in every contract.</comment>
-                    <validate>required-entry</validate>
-                </field>
-                <field id="broker_phone" translate="label comment" type="text" sortOrder="52" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Broker Phone Number</label>
-                    <comment>E.164 format, e.g. +966559555559. Leave empty if no broker party is needed.</comment>
-                </field>
-                <!-- Contract settings -->
-                <field id="return_policy" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Return Policy</label>
-                    <source_model>Waffy\Payment\Model\Config\Source\ReturnPolicy</source_model>
-                </field>
-                <field id="return_fee_payee" translate="label" type="select" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Return Fee Payee</label>
-                    <source_model>Waffy\Payment\Model\Config\Source\ReturnFeePayee</source_model>
-                </field>
-                <field id="is_deliverable" translate="label comment" type="select" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Is Deliverable</label>
-                    <comment>Product requires physical delivery.</comment>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                </field>
-                <field id="is_inspectable" translate="label comment" type="select" sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Is Inspectable</label>
-                    <comment>Buyer can inspect goods before funds are released.</comment>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                </field>
-                <field id="is_acceptable" translate="label comment" type="select" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Is Acceptable (by Customer)</label>
-                    <comment>Buyer explicitly accepts/rejects before funds are released.</comment>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                </field>
-                <field id="milestone_deadline_days" translate="label comment" type="text" sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Milestone Deadline (days)</label>
-                    <comment>Days from order date until the payment milestone expires. Default: 30.</comment>
-                    <validate>validate-digits validate-greater-than-zero</validate>
-                </field>
-                <field id="category" translate="label comment" type="text" sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Contract Category</label>
-                    <comment>Category shown to the buyer on the Waffy payment page. E.g. Services, Electronics, Food.</comment>
-                </field>
-
-                <!-- Standard Magento fields -->
-                <field id="order_status" translate="label" type="select" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>New Order Status</label>
-                    <source_model>Magento\Sales\Model\Config\Source\Order\Status\NewStatus</source_model>
-                </field>
-                <field id="allowspecific" translate="label" type="allowspecific" sortOrder="140" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Payment from Applicable Countries</label>
-                    <source_model>Magento\Payment\Model\Config\Source\Allspecificcountries</source_model>
-                </field>
-                <field id="specificcountry" translate="label" type="multiselect" sortOrder="150" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Payment from Specific Countries</label>
-                    <source_model>Magento\Directory\Model\Config\Source\Country</source_model>
-                    <can_be_empty>1</can_be_empty>
-                </field>
-
-                <!-- Advanced: URL overrides (normally derived from Environment) -->
-                <field id="auth_base_url" translate="label comment" type="text" sortOrder="160" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Auth Base URL Override</label>
-                    <comment><![CDATA[<strong>Leave empty</strong> — the URL is set automatically by the Environment selection. Fill only to point at a custom/staging server.]]></comment>
-                </field>
-                <field id="api_base_url" translate="label comment" type="text" sortOrder="170" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>API Base URL Override</label>
-                    <comment><![CDATA[<strong>Leave empty</strong> — the URL is set automatically by the Environment selection. Fill only to point at a custom/staging server.]]></comment>
                 </field>
             </group>
         </section>

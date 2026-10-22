@@ -3,7 +3,7 @@
 **Extension:** Waffy Escrow Payment for Magento 2
 **Composer package:** `waffy/module-payment`
 **Module name:** `Waffy_Payment`
-**Version:** 0.6.0
+**Version:** 0.7.0
 **License:** OSL-3.0
 
 Compatible with **Adobe Commerce (Cloud & on-premises) 2.4.x** and
@@ -23,7 +23,7 @@ Compatible with **Adobe Commerce (Cloud & on-premises) 2.4.x** and
 | PHP | 8.1 or higher |
 | PHP extensions | `ext-json`, `ext-openssl` (standard on any Magento host) |
 | Access | SSH / command-line access to the store (see note below) |
-| Waffy credentials | Client ID, Client Secret, admin email & password — request from **support@waffyapp.com** |
+| Waffy account | An organization in the Waffy portal (`portal-dev.waffyapp.com` for sandbox, `portal.waffyapp.com` for live) — the setup wizard walks you through it |
 
 > **Why the command line?** Since Magento 2.4.0 the admin "Web Setup Wizard"
 > was removed, so **all** extensions on both Adobe Commerce and Magento Open
@@ -60,7 +60,7 @@ bin/magento setup:static-content:deploy -f
 bin/magento cache:flush
 ```
 
-> Pin an exact version if you prefer: `composer require waffy/module-payment:0.6.0`.
+> Pin an exact version if you prefer: `composer require waffy/module-payment:0.7.0`.
 >
 > **On Adobe Commerce Cloud:** run the `composer require` locally, then commit
 > `composer.json` + `composer.lock` and `git push`. The Cloud build/deploy
@@ -100,7 +100,7 @@ commit that file to Git**.
 Confirm the extension is listed under **My Profile → My Purchases**, then run:
 
 ```bash
-composer require waffy/module-payment:0.6.0
+composer require waffy/module-payment:0.7.0
 bin/magento module:enable Waffy_Payment
 bin/magento setup:upgrade
 bin/magento setup:di:compile
@@ -133,7 +133,7 @@ https://github.com/WaffyApp/waffy-magento2/releases/latest/download/waffy-module
 ```bash
 # From the Magento root
 mkdir -p app/code/Waffy/Payment
-unzip waffy-module-payment-0.6.0.zip -d app/code/Waffy/Payment
+unzip waffy-module-payment-0.7.0.zip -d app/code/Waffy/Payment
 
 bin/magento module:enable Waffy_Payment
 bin/magento setup:upgrade
@@ -159,52 +159,37 @@ Expected output: `Module is enabled`.
 
 ## 3. Configuration (Admin panel — no commands)
 
-Go to **Stores → Configuration → Sales → Payment Methods → Waffy Escrow
-Payment** and complete the following.
+Go to **Stores → Waffy setup**. The wizard has three steps; you can re-open any
+of them later to change the connection.
 
-### 3.1 Connect your Waffy account
+### 3.1 Create your Waffy client
 
-1. **Environment** — set to **Sandbox** first for testing (no real money).
-2. Enter the **Sandbox Client ID**, **Client Secret**, **Admin Email**, and
-   **Admin Password** provided by Waffy.
-3. **Merchant Phone Number** *(required)* — E.164 format, e.g. `+9665XXXXXXXX`.
-   This identifies the merchant on every escrow contract.
-4. *(Optional)* **Broker Phone Number** — leave empty if not used.
+Choose **Sandbox** first (no real money), then follow the link to the Waffy
+portal: set up your organization if you have not already, create an API client
+for Magento, and download its **env file**. Keep the client secret at hand —
+the file does not include it.
 
-### 3.2 Register your webhook with Waffy
+### 3.2 Connect
 
-1. Copy the **Webhook URL** shown at the top of the configuration section.
-   It looks like: `https://your-store.com/waffy/webhook`
-2. Send that URL to the Waffy team so they register your store for order
-   status updates.
-3. *(Optional)* **Webhook Allowed IPs** — leave empty to allow all. To
-   restrict, enter one IP or CIDR range per line (ask Waffy for their server
-   IPs first).
+Upload the env file, or type the values in (client ID, admin username — a mobile or an email,
+organization account ID). Enter the **client secret** and **admin password**.
+The page shows whether the values are **SANDBOX** or **LIVE** and refuses a
+file that does not match the environment you chose.
 
-### 3.3 Contract settings
+Saving stores the connection as a draft: your current connection (if any)
+keeps taking payments until the next step succeeds.
 
-Match these to how you sell:
+### 3.3 Verify & activate
 
-| Setting | Meaning |
-|---------|---------|
-| **Return Policy** | Whether/what returns are allowed on the contract |
-| **Return Fee Payee** | Who pays the return fee (provider / customer) |
-| **Is Deliverable** | Product requires physical delivery |
-| **Is Inspectable** | Buyer may inspect goods before funds are released |
-| **Is Acceptable (by Customer)** | Buyer explicitly accepts/rejects before release |
-| **Milestone Deadline (days)** | Days until the payment milestone expires (default 30) |
-| **Contract Category** | Category shown to the buyer on the Waffy page (e.g. Services) |
+**Run checks and activate** tests the client and admin credentials against
+Waffy, reads your client's settings, and **registers your store's webhook URL
+with Waffy** (`https://your-store.com/waffy/webhook`) — nothing to send to the
+Waffy team. When every check passes, the connection goes live and the payment
+method is enabled.
 
-### 3.4 Storefront settings
-
-1. **Title** — what buyers see at checkout (e.g. "Pay with Waffy").
-2. **Payment from Applicable Countries** — all, or a specific list.
-3. **Enabled** → **Yes**.
-4. Click **Save Config**, then flush the cache:
-
-```bash
-bin/magento cache:flush
-```
+The contract terms (no returns, 30-day milestone, category "Services") are
+fixed for every store. The title buyers see at checkout is under **Stores →
+Configuration → Sales → Payment Methods → Waffy Escrow Payment**.
 
 ---
 
@@ -219,11 +204,10 @@ bin/magento cache:flush
 
 ## 5. Go Live
 
-1. Set **Environment → Production**.
-2. Enter your **Production** Client ID, Client Secret, Admin Email & Password.
-3. If your store URL changed, re-share the new **Webhook URL** with Waffy.
-4. **Save Config** and flush the cache.
-5. Place one small real order to confirm end to end.
+1. Open **Stores → Waffy setup**, choose **Live** in step 1, and create a live
+   client in `portal.waffyapp.com`.
+2. Upload the live env file in step 2 and run the checks in step 3.
+3. Place one small real order to confirm end to end.
 
 ---
 
@@ -231,9 +215,9 @@ bin/magento cache:flush
 
 | Symptom | Fix |
 |---------|-----|
-| Waffy not shown at checkout | Confirm **Enabled = Yes**, correct **countries**, and `cache:flush` was run |
+| Waffy not shown at checkout | Run the checks in **Stores → Waffy setup**, confirm **Enabled = Yes**, and run `cache:flush` |
 | `composer require` auth error | Use Marketplace public key as username, private key as password (Access Keys) |
-| Order status not updating | Confirm the **Webhook URL** was registered with Waffy and isn't blocked by the IP allowlist |
+| Order status not updating | Re-run the checks in **Stores → Waffy setup** — the last one registers the webhook URL with Waffy |
 | Class/compile errors after install | Re-run `bin/magento setup:di:compile` then `cache:flush` |
 
 ## Support

@@ -93,10 +93,9 @@
     color: #333333;
 }
 
-/* ── Live checkout progress ───────────────────────────────────────────────────
-   Mirrors assets/css/waffy-disclaimer.css in waffy-woocommerce so the two
-   platforms present the same thing; the markup is built in
-   method-renderer/waffy-payment.js. The step list renders in sandbox only. */
+/* ── Checkout progress ────────────────────────────────────────────────────────
+   One row per Waffy step (contract, consent, payment page); the markup is built
+   in method-renderer/waffy-payment.js. */
 
 .waffy-progress {
     margin: 1.5rem 0 0;
@@ -273,6 +272,48 @@
     border-top-color: #ffffff;
     border-radius: 50%;
     animation: waffy-spin 0.7s linear infinite;
+}
+
+/* ── OTP view and failure view ──────────────────────────────────────────── */
+
+.waffy-disclaimer [hidden] {
+    display: none !important;
+}
+
+.waffy-otp__label {
+    display: block;
+    margin: 1.25rem 0 0.4rem;
+    font-weight: 600;
+}
+
+.waffy-otp__code {
+    width: 100%;
+    text-align: center;
+    font-size: 1.6rem;
+    letter-spacing: 0.6em;
+    font-variant-numeric: tabular-nums;
+}
+
+.waffy-otp__error {
+    margin: 0.6rem 0 0;
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.waffy-otp__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
+
+.waffy-otp__cancel {
+    background: none;
+    border: 0;
+    color: #5c6b80;
+    text-decoration: underline;
+    cursor: pointer;
 }
 
 @keyframes waffy-spin {

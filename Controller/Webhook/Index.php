@@ -16,6 +16,7 @@ use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollection
 use Psr\Log\LoggerInterface;
 use Waffy\Ecommerce\Exception\WebhookException;
 use Waffy\Ecommerce\Model\WebhookEvent;
+use Waffy\Ecommerce\Webhook\WaffyWebhookIps;
 use Waffy\Ecommerce\Webhook\OrderAction;
 use Waffy\Ecommerce\Webhook\WebhookIpAllowlist;
 use Waffy\Ecommerce\Webhook\WebhookOutcome;
@@ -30,6 +31,7 @@ use Waffy\Payment\Model\Config;
  *
  * The reusable business logic lives in the SDK:
  *   - {@see WebhookIpAllowlist} — request-origin check (webhooks are unsigned)
+ *   - {@see WaffyWebhookIps}    — the addresses Waffy sends from (no merchant setting)
  *   - {@see WebhookEvent}       — parse the {contractId, status, referenceId} payload
  *   - {@see WebhookOutcome}     — status → platform-neutral action + comments
  *
@@ -52,7 +54,9 @@ class Index implements HttpPostActionInterface, CsrfAwareActionInterface
         $json = $this->jsonFactory->create();
 
         $clientIp = (string) $this->remoteAddress->getRemoteAddress();
-        if (!WebhookIpAllowlist::isAllowed($clientIp, $this->config->getWebhookAllowedIps())) {
+        // Empty until Waffy publishes its addresses (TBD #11), which allows all.
+        $allowed = WaffyWebhookIps::forEnvironment($this->config->getEnvironmentEnum());
+        if (!WebhookIpAllowlist::isAllowed($clientIp, $allowed)) {
             $this->logger->warning('Waffy webhook: request blocked by IP allowlist.', ['ip' => $clientIp]);
             return $json->setHttpResponseCode(403)->setData(['error' => 'Forbidden']);
         }

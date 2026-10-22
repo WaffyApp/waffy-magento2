@@ -9,13 +9,9 @@ use Magento\Framework\UrlInterface;
 use Waffy\Ecommerce\Branding\Logo;
 
 /**
- * Publishes what the checkout JS needs into window.checkoutConfig.payment.waffy_payment.
- *
- * `isSandbox` gates the per-call checklist in the disclaimer modal: on a sandbox
- * store it lists every Waffy API call as it happens, which is what makes the
- * token cache visible; in production only the progress bar is shown, because the
- * step names describe our integration's plumbing rather than anything a buyer
- * needs to read.
+ * Publishes what the checkout JS needs into window.checkoutConfig.payment.waffy_payment:
+ * the step endpoints the modal calls after the order is placed, the OTP length,
+ * the cart URL to return to on cancel, and the logo.
  */
 class CheckoutConfigProvider implements ConfigProviderInterface
 {
@@ -33,7 +29,9 @@ class CheckoutConfigProvider implements ConfigProviderInterface
             'payment' => [
                 'waffy_payment' => [
                     'isSandbox'   => $this->config->isSandbox(),
-                    'progressUrl' => $this->url->getUrl('waffy/checkout/progress'),
+                    'stepUrl'     => $this->url->getUrl('waffy/checkout'),
+                    'cartUrl'     => $this->url->getUrl('checkout/cart'),
+                    'otpLength'   => CheckoutSteps::OTP_LENGTH,
                     // Inline SVG rather than a static URL: the payment method
                     // template is a Knockout template with no way to resolve a
                     // view file, and this keeps the logo out of the static

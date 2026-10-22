@@ -10,16 +10,18 @@ use Magento\Store\Model\ScopeInterface;
 use Waffy\Ecommerce\Config\Environment;
 
 /**
- * Reads all Waffy payment configuration from Magento system config.
+ * Reads the Waffy payment configuration from Magento system config.
  * Config path: payment/waffy_payment/*
+ *
+ * The Waffy connection (client, admin, organization account, hosts) is written
+ * by the setup wizard (Stores → Waffy setup), one set per environment:
+ * {sandbox|production}_{field}. Everything else that used to be a setting
+ * (return policy, category, deadline, …) is now an SDK default, the same on
+ * every platform.
  */
 class Config
 {
     private const PATH = 'payment/waffy_payment/';
-
-    // Per-environment base URLs are owned by the SDK (Waffy\Ecommerce\Config\Environment)
-    // so all platform plugins share one source of truth; an explicit override in
-    // store config still wins (see getAuthBaseUrl/getApiBaseUrl).
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
@@ -43,12 +45,17 @@ class Config
     /** 'sandbox' or 'production'. Defaults to sandbox — going live is an explicit act. */
     public function getEnvironment(?int $storeId = null): string
     {
-        return (string) $this->getValue('environment', $storeId) ?: 'sandbox';
+        return Environment::fromString((string) $this->getValue('environment', $storeId))->value;
+    }
+
+    public function getEnvironmentEnum(?int $storeId = null): Environment
+    {
+        return Environment::fromString($this->getEnvironment($storeId));
     }
 
     public function isSandbox(?int $storeId = null): bool
     {
-        return $this->getEnvironment($storeId) !== 'production';
+        return $this->getEnvironmentEnum($storeId) === Environment::Sandbox;
     }
 
     public function getClientId(?int $storeId = null): string
@@ -59,25 +66,10 @@ class Config
     /** Returns the decrypted client secret. */
     public function getClientSecret(?int $storeId = null): string
     {
-        $encrypted = (string) $this->getEnvValue('client_secret', $storeId);
-        if ($encrypted === '') {
-            return '';
-        }
-        return $this->encryptor->decrypt($encrypted);
+        return $this->decrypt((string) $this->getEnvValue('client_secret', $storeId));
     }
 
-    /** E.164 phone number used as the PROVIDER party in every contract. */
-    public function getMerchantPhone(?int $storeId = null): string
-    {
-        return (string) $this->getValue('merchant_phone', $storeId);
-    }
-
-    /** E.164 phone number for the BROKER party. Empty string means no broker. */
-    public function getBrokerPhone(?int $storeId = null): string
-    {
-        return (string) $this->getValue('broker_phone', $storeId);
-    }
-
+    /** The client admin's username — an E.164 mobile on Waffy ID. */
     public function getClientAdminEmail(?int $storeId = null): string
     {
         return (string) $this->getEnvValue('client_admin_email', $storeId);
@@ -86,58 +78,37 @@ class Config
     /** Returns the decrypted client admin password. */
     public function getClientAdminPassword(?int $storeId = null): string
     {
-        $encrypted = (string) $this->getEnvValue('client_admin_password', $storeId);
-        if ($encrypted === '') {
-            return '';
-        }
-        return $this->encryptor->decrypt($encrypted);
+        return $this->decrypt((string) $this->getEnvValue('client_admin_password', $storeId));
     }
 
-    public function getReturnPolicy(?int $storeId = null): string
+    /** The organization's Waffy account id — the contract PROVIDER (`org_account_id`). */
+    public function getOrgAccountId(?int $storeId = null): string
     {
-        return (string) $this->getValue('return_policy', $storeId) ?: 'NO_RETURN';
+        return (string) $this->getEnvValue('org_account_id', $storeId);
     }
 
-    public function getReturnFeePayee(?int $storeId = null): string
+    public function getOrganizationCode(?int $storeId = null): string
     {
-        return (string) $this->getValue('return_fee_payee', $storeId) ?: 'PROVIDER';
+        return (string) $this->getEnvValue('organization_code', $storeId);
     }
 
-    public function isDeliverable(?int $storeId = null): bool
+    /** From the merchant's env file; the SDK's Environment default when typed in. */
+    public function getIdBaseUrl(?int $storeId = null): string
     {
-        return $this->scopeConfig->isSetFlag(
-            self::PATH . 'is_deliverable',
-            ScopeInterface::SCOPE_STORE,
-            $storeId,
-        );
+        return rtrim((string) $this->getEnvValue('id_base_url', $storeId), '/')
+            ?: $this->getEnvironmentEnum($storeId)->idBaseUrl();
     }
 
-    public function isInspectable(?int $storeId = null): bool
+    public function getAuthBaseUrl(?int $storeId = null): string
     {
-        return $this->scopeConfig->isSetFlag(
-            self::PATH . 'is_inspectable',
-            ScopeInterface::SCOPE_STORE,
-            $storeId,
-        );
+        return rtrim((string) $this->getEnvValue('auth_base_url', $storeId), '/')
+            ?: $this->getEnvironmentEnum($storeId)->authBaseUrl();
     }
 
-    public function isAcceptable(?int $storeId = null): bool
+    public function getApiBaseUrl(?int $storeId = null): string
     {
-        return $this->scopeConfig->isSetFlag(
-            self::PATH . 'is_acceptable',
-            ScopeInterface::SCOPE_STORE,
-            $storeId,
-        );
-    }
-
-    public function getMilestoneDeadlineDays(?int $storeId = null): int
-    {
-        return (int) ($this->getValue('milestone_deadline_days', $storeId) ?: 30);
-    }
-
-    public function getCategory(?int $storeId = null): string
-    {
-        return (string) $this->getValue('category', $storeId) ?: 'Services';
+        return rtrim((string) $this->getEnvValue('api_base_url', $storeId), '/')
+            ?: $this->getEnvironmentEnum($storeId)->apiBaseUrl();
     }
 
     public function getPaymentType(?int $storeId = null): string
@@ -158,34 +129,20 @@ class Config
         ) ?: 'Store';
     }
 
-    /**
-     * IPs/CIDR ranges allowed to call the webhook endpoint.
-     * Empty array means no restriction (allow all).
-     *
-     * @return string[]
-     */
-    public function getWebhookAllowedIps(?int $storeId = null): array
+    /** True when the gateway is enabled and every credential checkout needs is present. */
+    public function hasCompleteCredentials(?int $storeId = null): bool
     {
-        $raw = (string) $this->getValue('webhook_allowed_ips', $storeId);
-
-        return array_values(array_filter(array_map(
-            'trim',
-            preg_split('/[\s,]+/', $raw) ?: [],
-        )));
+        return $this->isActive($storeId)
+            && $this->getClientId($storeId) !== ''
+            && $this->getClientSecret($storeId) !== ''
+            && $this->getClientAdminEmail($storeId) !== ''
+            && $this->getClientAdminPassword($storeId) !== ''
+            && $this->getOrgAccountId($storeId) !== '';
     }
 
-    /** Environment-derived URL; an explicit override in config wins. */
-    public function getAuthBaseUrl(?int $storeId = null): string
+    private function decrypt(string $encrypted): string
     {
-        return rtrim((string) $this->getValue('auth_base_url', $storeId), '/')
-            ?: Environment::fromString($this->getEnvironment($storeId))->authBaseUrl();
-    }
-
-    /** Environment-derived URL; an explicit override in config wins. */
-    public function getApiBaseUrl(?int $storeId = null): string
-    {
-        return rtrim((string) $this->getValue('api_base_url', $storeId), '/')
-            ?: Environment::fromString($this->getEnvironment($storeId))->apiBaseUrl();
+        return $encrypted === '' ? '' : (string) $this->encryptor->decrypt($encrypted);
     }
 
     private function getValue(string $field, ?int $storeId): mixed

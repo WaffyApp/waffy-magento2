@@ -18,12 +18,14 @@ extra dependencies to install).
 
 - **Escrow-backed checkout** — Waffy appears as a payment method; buyers pay on
   Waffy's secure hosted payment page, so card data never touches your store.
-- **Simple admin setup** — connect your account with your Waffy API
-  credentials and a sandbox/production toggle, all from the Magento admin.
-- **Automatic order status updates** — a built-in webhook receiver keeps the
-  Magento order in sync as the payment is secured in escrow and later released.
-- **Configurable contracts** — return policy, delivery/inspection/acceptance
-  flags, milestone deadline, and buyer-facing category.
+- **Step-by-step setup** — a three-step wizard (Stores → Waffy setup): create
+  your client in the Waffy portal, upload its env file, and verify. Re-open
+  any step later to change the connection.
+- **Buyer consent built in** — when Waffy needs the buyer's consent, checkout
+  asks for a 4-digit code sent to their phone, in the same modal.
+- **Automatic order status updates** — the wizard registers your webhook with
+  Waffy, and the built-in receiver keeps the Magento order in sync as the
+  payment is secured in escrow and later released.
 - **Self-contained** — the Waffy PHP SDK is bundled, so installation pulls in
   everything the extension needs.
 
@@ -55,18 +57,19 @@ bin/magento cache:flush
 
 ## Configuration
 
-You'll need Waffy API credentials — contact **support@waffyapp.com** to get
-them.
+In the admin, go to **Stores → Waffy setup** (or the link in **Stores →
+Configuration → Sales → Payment Methods → Waffy Escrow Payment**):
 
-In the admin, go to **Stores → Configuration → Sales → Payment Methods →
-Waffy Escrow Payment**:
-
-1. Set **Environment** to **Sandbox** for testing.
-2. Enter your Waffy **Client ID / Secret** and **admin email & password**.
-3. Set your **Merchant Phone** (E.164, e.g. `+9665XXXXXXXX`).
-4. Copy the **Webhook URL** shown and send it to the Waffy team to register
-   your store.
-5. Adjust the contract settings, set **Enabled → Yes**, and **Save Config**.
+1. **Create your Waffy client** — pick **Sandbox** or **Live** and follow the
+   link to the Waffy portal (`portal-dev.waffyapp.com` / `portal.waffyapp.com`)
+   to set up your organization and create a client for Magento.
+2. **Connect** — upload the client's env file (or type the values in), and
+   enter the client secret and admin password, which the file does not carry.
+   The page shows whether the values are sandbox or live and refuses a file for
+   the other environment.
+3. **Verify & activate** — runs live checks against Waffy, registers your
+   webhook URL with Waffy, and enables the payment method when everything
+   passes. Until then, your current connection keeps taking payments.
 
 Then place a test order and pay with Waffy to confirm the flow end to end.
 See [INSTALL.md](INSTALL.md) for the detailed walkthrough and go-live steps.
@@ -79,63 +82,47 @@ See [INSTALL.md](INSTALL.md) for the detailed walkthrough and go-live steps.
 3. Waffy notifies your store as the payment is secured and later released, and
    the Magento order status updates automatically.
 
+### Checkout steps
+
+After the order is placed the checkout modal calls one endpoint per step
+(`POST waffy/checkout/*`, each acting only on the session's own last order):
+
+```
+prepare ─┬─▶ startpayment ─────────────┐
+begin ───┴─(consent resolved)─▶ ticket ─┴─▶ go → "Continue to Waffy"
+```
+
+- `prepare` creates the contract, milestone and parties; `begin` links the
+  buyer and — only when Waffy says their consent is required — sends an OTP,
+  which the modal collects and `verify` checks.
+- Start-payment never waits for the buyer; the ticket waits for the contract
+  and the buyer's consent.
+- Cancelling at the OTP step cancels the order, restores the cart and asks
+  Waffy to remove the unpaid contract. Waffy has no endpoint for that yet, so
+  the order is flagged and the `waffy_discard_abandoned_contracts` cron retries.
+
+Each step records its progress in the `waffy_checkout` table, one column per
+fact, so the parallel requests never overwrite each other.
+
 ### Token warm-up
 
-Checkout needs four OAuth tokens. All are cached (encrypted) in `waffy_token` and
-reused until they near expiry, and the module keeps that cache warm so checkout
-does no auth work:
+The org and client admin tokens are cached (encrypted) in `waffy_token` and
+reused until they near expiry. The `waffy_refresh_tokens` cron job runs every
+15 minutes per active store and renews either token within 30 minutes of
+expiring — a no-op otherwise. The setup wizard primes them on activation.
+**This requires Magento cron to be running**; if it is not, checkout still
+works, it just fetches the tokens itself.
 
-- **Store tokens (app + merchant).** The `waffy_refresh_tokens` cron job runs every
-  15 minutes per active store and renews either token that is within 30 minutes of
-  expiring — a no-op otherwise. Also primed when the payment configuration is
-  saved. **This requires Magento cron to be running**; if it is not, checkout
-  still works, it just fetches the tokens itself the first time.
-- **Buyer token.** Minted on `customer_login`, and on the first storefront page of
-  a session for a customer who arrived already logged in. Requires a telephone on
-  the customer's default billing address; guests are never signed up
-  speculatively. The work is deferred until after the response is sent
-  (`Model\AfterResponse`), so shoppers never wait for it.
+There is no buyer token to prefetch on Waffy ID: the payment ticket is scoped to
+one contract, so it is minted at checkout.
 
-Failures are logged (`var/log/system.log`) and never surfaced to a shopper.
-
-### Verifying it: the call log
-
-Every Waffy call is logged with a timestamp, its outcome and how long it took:
+Every Waffy call is logged with its outcome and duration:
 
 ```bash
-grep "Waffy: checkout step" var/log/system.log | tail -8
-```
-```
-12:36:09 Waffy: checkout step=app_token        status=cached took=0.0ms
-12:36:09 Waffy: checkout step=merchant_token   status=cached took=0.0ms
-12:36:09 Waffy: checkout step=customer_sign_up status=cached took=0.0ms
-12:36:09 Waffy: checkout step=customer_token   status=cached took=0.0ms
-12:36:15 Waffy: checkout step=create_contract  status=done   took=5884.1ms
+grep "Waffy: " var/log/system.log | tail -8
 ```
 
-`status=cached` means the call **never left the server** — the token was already
-in `waffy_token`. The context says which path made it: `warm-up` (cron),
-`login-prefetch` (customer signed in) or `checkout`. A healthy store shows the
-four auth calls under `warm-up`/`login-prefetch` and only the four contract calls
-under `checkout`.
-
-### Live progress in the checkout modal
-
-The disclaimer modal shows a progress bar that fills as each call completes, fed
-by `GET waffy/checkout/progress` — polled with a key the browser sets as a cookie
-just before the order is placed. In **sandbox** the modal also lists each call
-with a checkmark, a duration, and `cached` against the ones the token cache
-skipped; in **production** only the bar is shown.
-
-Two Magento-specific details make this work:
-
-- **The progress endpoint is session-free.** It reads its key straight off the
-  request cookies and looks state up in the cache — no session, cart or customer.
-- **`Controller\Checkout\Start` closes the session before calling Waffy.** PHP
-  holds an exclusive lock on the session for the whole request, so a checkout
-  taking tens of seconds would stall every other request from that browser and
-  the polls would all arrive at the end. `writeClose()` on the JSON path releases
-  it before the slow work begins.
+`status=cached` means the call never left the server.
 
 ## Support
 

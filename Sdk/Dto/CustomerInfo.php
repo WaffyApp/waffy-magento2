@@ -13,6 +13,8 @@ use Waffy\Ecommerce\Support\PhoneNumber;
  * phoneNumber   — E.164 format, e.g. +966555555555. Required.
  * clientUserId  — optional merchant-side user ID; falls back to phone digits in the orchestrator.
  * password      — unused by the API; omit or pass null.
+ * email         — optional. Sent only to Waffy ID (AuthMode::Keycloak) registration,
+ *                 which accepts it; the legacy sign-up payload never carries it.
  */
 readonly class CustomerInfo
 {
@@ -22,6 +24,7 @@ readonly class CustomerInfo
         public string $lastName,
         public ?string $clientUserId = null,
         public ?string $password = null,
+        public ?string $email = null,
     ) {
         if (!PhoneNumber::isValidE164($phoneNumber)) {
             throw new ValidationException(

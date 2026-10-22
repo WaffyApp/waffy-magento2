@@ -1,0 +1,46 @@
+/* Waffy setup wizard (Stores → Waffy setup). */
+
+.waffy-setup { max-width: 980px; }
+.waffy-setup h2 { margin: 1.5rem 0 0.75rem; }
+
+.waffy-setup__tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 1.25rem; padding: 0; list-style: none; }
+.waffy-setup__tabs a { display: block; padding: 0.55rem 0.9rem; border: 1px solid #adadad; border-radius: 4px; color: #41362f; text-decoration: none; }
+.waffy-setup__tabs a.current { background: #0D44AD; border-color: #0D44AD; color: #fff; }
+
+.waffy-setup__banner { padding: 0.7rem 1rem; border-radius: 4px; font-weight: 700; }
+.waffy-setup__banner.sandbox { background: #fef0c7; color: #93370d; }
+.waffy-setup__banner.production { background: #d1fadf; color: #05603a; }
+
+.waffy-badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.85em; font-weight: 700; }
+.waffy-badge.sandbox { background: #fef0c7; color: #93370d; }
+.waffy-badge.production { background: #d1fadf; color: #05603a; }
+
+.waffy-setup__choice { display: flex; gap: 0.75rem; }
+.waffy-setup__guide { background: #f5f5f5; border-radius: 4px; padding: 0.75rem 1rem 0.75rem 2rem; }
+p.waffy-setup__guide { padding-left: 1rem; }
+
+.waffy-setup__hosts, .waffy-setup__summary { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1.25rem; }
+.waffy-setup__hosts td, .waffy-setup__hosts th, .waffy-setup__summary td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #e3e3e3; text-align: left; }
+
+.waffy-setup__modes { display: flex; margin-top: 1.25rem; border-bottom: 1px solid #e3e3e3; }
+.waffy-setup__modes button { padding: 0.6rem 1.1rem; border: 1px solid transparent; border-bottom: 0; background: none; cursor: pointer; margin-bottom: -1px; border-radius: 4px 4px 0 0; color: #514943; }
+.waffy-setup__modes button[aria-selected="true"] { border-color: #e3e3e3; background: #fff; color: #303030; font-weight: 700; }
+.waffy-setup__mode-panels { max-width: 560px; }
+.waffy-setup__mode-panels .waffy-setup__box { border-top: 0; border-radius: 0 0 4px 4px; }
+.waffy-setup__mode-panels [hidden] { display: none; }
+.waffy-setup__box { border: 1px solid #e3e3e3; border-radius: 4px; padding: 1rem 1.25rem 1.25rem; }
+.waffy-setup__box legend { font-weight: 700; padding: 0 0.4rem; }
+.waffy-setup__box label { display: block; font-weight: 600; margin: 0.9rem 0 0.3rem; }
+.waffy-setup__box input:not([type="hidden"]):not([type="file"]) { width: 100%; }
+.waffy-setup__box button { margin-top: 1rem; }
+.waffy-setup__preview { margin-top: 0.5rem; font-size: 0.92em; }
+.waffy-setup__error { color: #e22626; font-weight: 600; }
+
+.waffy-setup__ok { color: #05603a; font-weight: 700; }
+.waffy-setup__checks { list-style: none; padding: 0; margin: 0 0 1rem; }
+.waffy-setup__checks li { padding: 0.35rem 0; }
+.waffy-setup__checks .pass::before { content: "✓ "; color: #05603a; font-weight: 700; }
+.waffy-setup__checks .fail::before { content: "✕ "; color: #e22626; font-weight: 700; }
+.waffy-setup__checks .skip::before { content: "– "; color: #8a8a8a; }
+.waffy-setup__checks .info::before { content: "ⓘ "; color: #8a8a8a; }
+.waffy-setup__checks .detail { display: block; margin-left: 1.4rem; color: #6b6b6b; font-size: 0.9em; }

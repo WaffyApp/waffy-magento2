@@ -14,5 +14,11 @@
              method="execute">
             <schedule>*/15 * * * *</schedule>
         </job>
+        <!-- Remove unpaid contracts of abandoned / cancelled orders (best-effort). -->
+        <job name="waffy_discard_abandoned_contracts"
+             instance="Waffy\Payment\Cron\DiscardAbandonedContracts"
+             method="execute">
+            <schedule>*/15 * * * *</schedule>
+        </job>
     </group>
 </config>

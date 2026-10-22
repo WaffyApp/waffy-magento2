@@ -6,8 +6,8 @@
 #   ./dev/switch-mode.sh packagist    # run the PUBLISHED package from Packagist
 #   ./dev/switch-mode.sh status       # show the current mode (no changes)
 #
-# local     → the module source is mounted READ-ONLY at /var/module (outside the
-#             Mutagen sync root) and installed as a Composer *path* package,
+# local     → the module source is mounted READ-ONLY at /var/www/html/waffy-module
+#             (a path Mutagen ignores) and installed as a Composer *path* package,
 #             symlinked into vendor/waffy/module-payment. Edit source on the host,
 #             then `ddev exec php bin/magento cache:flush` (or di:compile for
 #             DI/schema changes). The bundled Sdk/ provides the SDK.
@@ -15,9 +15,13 @@
 #             real merchant installs. No mounts.
 #
 # WHY this shape (learned the hard way):
-#   • Bind mounts INTO /var/www/html are shadowed empty by Mutagen — so we mount
-#     to /var/module (outside the sync root), like the store already does for the
-#     SDK at /var/sdk, and let Composer symlink it into vendor/.
+#   • Bind mounts INTO /var/www/html are shadowed empty by Mutagen unless Mutagen
+#     is told to ignore that path — so the mount point is added to the store's
+#     .ddev/mutagen/mutagen.yml ignore list.
+#   • The mount must be INSIDE /var/www/html: Magento resolves template paths to
+#     their real path and refuses any outside the root ("Path … cannot be used
+#     with directory /var/www/html/"), so a mount at /var/module breaks every
+#     .phtml the module renders.
 #   • The mount is READ-ONLY, so a container-side delete can never reach back and
 #     damage the host module source.
 #
@@ -35,8 +39,11 @@ COMPOSER_JSON="$TEST/composer.json"
 
 [ -d "$DDEV" ] || { echo "❌ magento-test/.ddev not found at $TEST"; exit 1; }
 
+MOUNT="/var/www/html/waffy-module"             # module source inside the container
+MUTAGEN_YML="$DDEV/mutagen/mutagen.yml"
+
 current_mode() {
-  if   grep -q '/var/module' "$COMPOSER_JSON"; then echo "local";
+  if   grep -qE "\"$MOUNT\"|/var/module" "$COMPOSER_JSON"; then echo "local";
   elif grep -q '"waffy/module-payment"' "$COMPOSER_JSON"; then echo "packagist";
   else echo "none"; fi
 }
@@ -45,43 +52,60 @@ current_mode() {
 # Only those keys are touched; everything else is preserved.
 rewrite_composer() {
   php -r '
-    $f = $argv[1]; $mode = $argv[2];
+    $f = $argv[1]; $mode = $argv[2]; $mount = $argv[4];
     $j = json_decode(file_get_contents($f), true);
     unset($j["require"]["waffy/module-payment"], $j["require"]["waffy/ecommerce-sdk"]);
-    // drop any local path repos we manage (/var/module, /var/sdk)
+    // drop any local path repos we manage (current mount, and the old /var/module, /var/sdk)
     $j["repositories"] = array_values(array_filter($j["repositories"] ?? [],
-      fn($r) => !in_array($r["url"] ?? "", ["/var/module", "/var/sdk"], true)));
+      fn($r) => !in_array($r["url"] ?? "", [$mount, "/var/module", "/var/sdk"], true)));
     if ($mode === "packagist") {
       $j["require"]["waffy/module-payment"] = $argv[3];
-    } else { // local: path package, symlinked from /var/module
+    } else { // local: path package, symlinked from the mount
       $j["require"]["waffy/module-payment"] = "*";
-      $j["repositories"][] = ["type"=>"path","url"=>"/var/module","options"=>["symlink"=>true]];
+      $j["repositories"][] = ["type"=>"path","url"=>$mount,"options"=>["symlink"=>true]];
     }
     ksort($j["require"]);
     file_put_contents($f, json_encode($j, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES)."\n");
-  ' "$COMPOSER_JSON" "$1" "$MODULE_VERSION"
+  ' "$COMPOSER_JSON" "$1" "$MODULE_VERSION" "$MOUNT"
 }
 
-# Mount the module source READ-ONLY to /var/module (outside /var/www/html).
-# One bind per component dir keeps magento-test/ out of the path package, so
-# Composer's classmap never descends into a nested Magento.
+# Keep Mutagen off the mount point, or it syncs the (empty) host side over it.
+# Taking the file over means dropping DDEV's #ddev-generated marker. Prints
+# "changed" when it edited the file, so the caller knows to reset Mutagen.
+ensure_mutagen_ignore() {
+  grep -q '"/waffy-module"' "$MUTAGEN_YML" && return 0
+  sed -i.bak -e '/^#ddev-generated/d' \
+    -e 's|^\( *\)- "/pub/media"$|&\
+\1- "/waffy-module"   # Waffy module bind mount (dev/switch-mode.sh)|' "$MUTAGEN_YML"
+  rm -f "$MUTAGEN_YML.bak"
+  grep -q '"/waffy-module"' "$MUTAGEN_YML" \
+    || { echo "❌ could not add /waffy-module to $MUTAGEN_YML ignore paths" >&2; exit 1; }
+  echo changed
+}
+
+# Mount the module source READ-ONLY at $MOUNT. One bind per component dir keeps
+# magento-test/ out of the path package, so Composer's classmap never descends
+# into a nested Magento. A NEW top-level module dir needs a line here.
 write_module_mount() {
   cat > "$DDEV/docker-compose.waffy.yaml" <<'YAML'
 #ddev-silent-no-warn
-# Module source, READ-ONLY, assembled at /var/module (outside the Mutagen sync
-# root). Composer installs it as a path package symlinked into vendor/.
+# Module source, READ-ONLY, assembled at /var/www/html/waffy-module (ignored by
+# Mutagen, see mutagen/mutagen.yml). Composer installs it as a path package
+# symlinked into vendor/. Generated by dev/switch-mode.sh.
 services:
   web:
     volumes:
-      - "../../composer.json:/var/module/composer.json:ro"
-      - "../../registration.php:/var/module/registration.php:ro"
-      - "../../Block:/var/module/Block:ro"
-      - "../../Console:/var/module/Console:ro"
-      - "../../Controller:/var/module/Controller:ro"
-      - "../../Model:/var/module/Model:ro"
-      - "../../etc:/var/module/etc:ro"
-      - "../../view:/var/module/view:ro"
-      - "../../Sdk:/var/module/Sdk:ro"
+      - "../../composer.json:/var/www/html/waffy-module/composer.json:ro"
+      - "../../registration.php:/var/www/html/waffy-module/registration.php:ro"
+      - "../../Block:/var/www/html/waffy-module/Block:ro"
+      - "../../Console:/var/www/html/waffy-module/Console:ro"
+      - "../../Controller:/var/www/html/waffy-module/Controller:ro"
+      - "../../Cron:/var/www/html/waffy-module/Cron:ro"
+      - "../../Model:/var/www/html/waffy-module/Model:ro"
+      - "../../Observer:/var/www/html/waffy-module/Observer:ro"
+      - "../../etc:/var/www/html/waffy-module/etc:ro"
+      - "../../view:/var/www/html/waffy-module/view:ro"
+      - "../../Sdk:/var/www/html/waffy-module/Sdk:ro"
 YAML
 }
 
@@ -115,10 +139,15 @@ case "$MODE" in
     rewrite_composer local
     write_module_mount
     rm -rf "$TEST/app/code/Waffy" "$TEST/generated/code/Waffy"
-    restart                                   # /var/module now populated (read-only)
-    ddev composer update --no-interaction     # symlinks vendor/waffy/module-payment → /var/module
+    MUTAGEN_STATE="$(ensure_mutagen_ignore)"   # exits the script on failure
+    if [ "$MUTAGEN_STATE" = changed ]; then
+      echo "▶ mutagen.yml changed — resetting Mutagen…"; ddev mutagen reset >/dev/null
+    fi
+    restart                                   # $MOUNT now populated (read-only)
+    # Only the Waffy package — a bare `composer update` would also bump Magento.
+    ddev composer update waffy/module-payment --no-interaction   # vendor/waffy/module-payment → $MOUNT
     magento_steps
-    echo "✅ LOCAL: module symlinked from /var/module (read-only host source)."
+    echo "✅ LOCAL: module symlinked from $MOUNT (read-only host source)."
     ;;
 
   packagist)
@@ -127,7 +156,7 @@ case "$MODE" in
     remove_module_mount
     rm -rf "$TEST/app/code/Waffy" "$TEST/generated/code/Waffy"
     restart
-    ddev composer update --no-interaction     # removes the symlink, installs from Packagist
+    ddev composer update waffy/module-payment --no-interaction   # removes the symlink, installs from Packagist
     magento_steps
     echo "✅ PACKAGIST: waffy/module-payment $MODULE_VERSION from vendor/."
     ;;

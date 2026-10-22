@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!--
+    An unpaid Waffy order was cancelled — remove its contract on Waffy too.
+    Global area: merchants cancel in the admin, Magento's pending-payment
+    cleanup cancels from cron.
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="order_cancel_after">
+        <observer name="waffy_discard_contract_on_order_cancel"
+                  instance="Waffy\Payment\Observer\DiscardContractOnOrderCancel"/>
+    </event>
+</config>

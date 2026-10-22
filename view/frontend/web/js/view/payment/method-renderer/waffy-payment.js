@@ -4,21 +4,13 @@ define([
     'Magento_Checkout/js/model/full-screen-loader',
     'Magento_Checkout/js/model/payment/additional-validators',
     'Magento_Ui/js/modal/modal',
-    'Magento_Ui/js/model/messageList',
     'mage/translate',
     'mage/url'
-], function ($, Component, fullScreenLoader, additionalValidators, modal, globalMessageList, $t, url) {
+], function ($, Component, fullScreenLoader, additionalValidators, modal, $t, url) {
     'use strict';
 
-    /**
-     * Poll cadence for the live progress display. Brisk at first — the early
-     * steps are the fast ones and the buyer is watching — then easing off, so a
-     * slow Waffy response doesn't turn into hundreds of requests.
-     */
-    var POLL_MIN_MS = 400,
-        POLL_MAX_MS = 2000,
-        POLL_BACKOFF = 1.25,
-        PROGRESS_COOKIE = 'waffy_progress_key';
+    /** Seconds before the buyer may ask for another OTP. */
+    var RESEND_COOLDOWN = 60;
 
     /** Store-level config published by Model\CheckoutConfigProvider. */
     function waffyConfig() {
@@ -27,38 +19,11 @@ define([
             window.checkoutConfig.payment.waffy_payment) || {};
     }
 
-    /**
-     * Mint the key that ties this browser's polling to this checkout run.
-     *
-     * A cookie rather than a request parameter: it rides along on both the
-     * place-order POST and the progress GET without either having to thread it
-     * through Magento's checkout payload. Must satisfy the server's
-     * [A-Za-z0-9]{8,64} check.
-     */
-    function newProgressKey() {
-        var alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-            out = '',
-            bytes,
-            i;
-
-        if (window.crypto && window.crypto.getRandomValues) {
-            bytes = new Uint8Array(24);
-            window.crypto.getRandomValues(bytes);
-            for (i = 0; i < bytes.length; i++) {
-                out += alphabet[bytes[i] % alphabet.length];
-            }
-        } else {
-            // This key only scopes a progress lookup, never anything
-            // security-bearing, so Math.random is an acceptable fallback.
-            while (out.length < 24) {
-                out += alphabet[Math.floor(Math.random() * alphabet.length)];
-            }
-        }
-
-        document.cookie = PROGRESS_COOKIE + '=' + out + '; path=/; SameSite=Lax' +
-            (window.location.protocol === 'https:' ? '; Secure' : '');
-
-        return out;
+    /** Error carrying the step endpoint's JSON ({ error, message }). */
+    function stepError(data) {
+        var error = new Error((data && data.error) || 'waffy_error');
+        error.data = data || {};
+        return error;
     }
 
     return Component.extend({
@@ -85,12 +50,10 @@ define([
         },
 
         /**
-         * Waffy is a redirect method: the real payment URL only exists after the
-         * order is placed server-side. We open a disclaimer modal, place the
-         * order, and prepare the Waffy link in the background — the modal's
-         * "Continue to Waffy" button shows a loading indicator and is disabled
-         * until the link is ready, then becomes clickable so the buyer can
-         * proceed once they've read the notice.
+         * Waffy is a redirect method: the payment URL only exists after the
+         * order is placed. We open the modal, place the order, and then run the
+         * Waffy steps from the modal (see afterPlaceOrder) — stopping for an OTP
+         * when Waffy says the buyer must consent.
          */
         placeOrder: function (data, event) {
             var self = this,
@@ -110,12 +73,7 @@ define([
             }
 
             this._orderPlaced = false;
-
-            // Mint the progress key BEFORE the order is placed: the Start
-            // controller reads it from the cookie to publish its progress under.
-            newProgressKey();
-
-            this._openDisclaimer();
+            this._openModal();
 
             // If placing the order fails, afterPlaceOrder() never runs. Watch the
             // place-order guard flip back to true and, if the order wasn't placed,
@@ -130,64 +88,282 @@ define([
                 }
             });
 
-            proceed.call(self, data, event); // places the order; afterPlaceOrder() fetches the link
+            proceed.call(self, data, event); // places the order; afterPlaceOrder() runs the Waffy steps
 
             return false;
         },
 
-        /**
-         * Called by the checkout JS once the order is successfully placed. Rather
-         * than redirecting immediately we ask the Start controller for the Waffy
-         * URL (JSON), then flip the modal button from loading to ready.
-         */
         afterPlaceOrder: function () {
-            var self = this;
-
             this._orderPlaced = true;
+            this._run();
+        },
 
-            $.ajax({
-                url: url.build('waffy/checkout/start'),
-                data: { format: 'json' },
-                dataType: 'json',
-                method: 'GET',
-                cache: false
-            }).done(function (res) {
-                if (res && res.url) {
+        // ── The Waffy steps ──────────────────────────────────────────────────
+
+        /**
+         * Runs the calls in the order the SDK documents, each as its own request:
+         *
+         *   prepare ─┬─▶ startPayment ─────────────┐
+         *   begin ───┴─(consent resolved)─▶ ticket ─┴─▶ go → "Continue to Waffy"
+         *
+         * `begin` sends an OTP only when Waffy says the buyer's consent is
+         * required; the modal then asks for the code. Start-payment never waits
+         * for the buyer.
+         */
+        _run: function () {
+            var self = this,
+                prepared,
+                consent,
+                payment,
+                ticket;
+
+            this._showView('progress');
+            this._setStep('contract', 'running');
+            this._setStep('consent', 'running');
+            this._setStep('payment', 'pending');
+
+            // Branch A: contract → milestone → parties (retried once).
+            prepared = this._api('prepare').catch(function () {
+                return self._api('prepare');
+            });
+            prepared.then(function () {
+                self._setStep('contract', 'done');
+            }, function () {
+                self._setStep('contract', 'failed');
+            });
+
+            // Branch B: Link Customer → [consent.required] Send OTP → Verify OTP.
+            consent = this._api('begin').then(function (res) {
+                if (!res.consentRequired) {
+                    return undefined;
+                }
+                if (!res.otpSent) {
+                    throw res.reason || $t('We could not send you a verification code.');
+                }
+                return self._askOtp();
+            });
+            consent.then(function () {
+                self._setStep('consent', 'done');
+            }, function () {
+                self._setStep('consent', 'failed');
+            });
+
+            // Start payment waits for the contract only; the ticket also for consent.
+            // Start payment runs quietly in the background — the buyer only sees
+            // "Getting your payment page" once their part (the code) is done.
+            payment = prepared.then(function () {
+                return self._api('startpayment');
+            });
+            ticket = Promise.all([prepared, consent]).then(function () {
+                self._setStep('payment', 'running');
+                return self._api('ticket');
+            });
+
+            Promise.all([payment, ticket])
+                .then(function () {
+                    return self._api('go');
+                })
+                .then(function (res) {
+                    self._setStep('payment', 'done');
                     self._readyUrl = res.url;
                     self._setButtonReady();
-                } else {
-                    self._closeWithError(res && res.message);
-                }
-            }).fail(function () {
-                self._closeWithError();
+                })
+                .catch(function (error) {
+                    self._fail(error);
+                });
+        },
+
+        /** POST one step; resolves with its JSON, rejects with stepError(). */
+        _api: function (step, body) {
+            var base = waffyConfig().stepUrl || url.build('waffy/checkout/');
+
+            if (base.slice(-1) !== '/') {
+                base += '/';
+            }
+
+            return new Promise(function (resolve, reject) {
+                $.ajax({
+                    url: base + step,
+                    method: 'POST',
+                    data: JSON.stringify(body || {}),
+                    contentType: 'application/json',
+                    dataType: 'json',
+                    cache: false
+                }).done(function (data) {
+                    resolve(data || {});
+                }).fail(function (xhr) {
+                    reject(stepError(xhr && xhr.responseJSON));
+                });
             });
         },
 
-        /** Build (once) and open the disclaimer modal with its button loading. */
-        _openDisclaimer: function () {
+        /** The OTP view: resolves once Waffy accepts the code. */
+        _askOtp: function () {
+            var self = this,
+                length = parseInt(waffyConfig().otpLength, 10) || 4,
+                $el = this._modalEl,
+                $code = $el.find('[data-role="otp-code"]'),
+                $error = $el.find('[data-role="otp-error"]'),
+                $validate = $el.find('[data-role="otp-validate"]'),
+                $resend = $el.find('[data-role="otp-resend"]'),
+                timer = null;
+
+            function cooldown(seconds) {
+                window.clearInterval(timer);
+                $resend.prop('disabled', true).text($t('Resend in') + ' ' + seconds);
+                timer = window.setInterval(function () {
+                    seconds -= 1;
+                    if (seconds > 0) {
+                        $resend.text($t('Resend in') + ' ' + seconds);
+                        return;
+                    }
+                    window.clearInterval(timer);
+                    $resend.prop('disabled', false).text($t('Resend code'));
+                }, 1000);
+            }
+
+            function showError(message) {
+                $error.text(message).prop('hidden', false);
+            }
+
+            return new Promise(function (resolve) {
+                $code.val('').attr('maxlength', length);
+                $error.prop('hidden', true);
+                $validate.prop('disabled', false);
+                self._showView('otp');
+                $code.trigger('focus');
+                cooldown(RESEND_COOLDOWN);
+
+                $resend.off('click').on('click', function () {
+                    self._api('begin', { resend: true }).then(function (res) {
+                        if (res.otpSent) {
+                            $error.prop('hidden', true);
+                            cooldown(RESEND_COOLDOWN);
+                        } else {
+                            showError(res.reason || $t('We could not send you a verification code.'));
+                        }
+                    }, function (error) {
+                        showError(self._messageOf(error));
+                    });
+                });
+
+                $el.find('[data-role="otp-cancel"]').off('click').on('click', function () {
+                    window.clearInterval(timer);
+                    self._cancel();
+                });
+
+                $el.find('[data-role="otp-form"]').off('submit').on('submit', function (event) {
+                    var code = String($code.val() || '').replace(/\s+/g, '');
+
+                    event.preventDefault();
+                    if (!new RegExp('^\\d{' + length + '}$').test(code)) {
+                        showError($t('Please enter the code we sent you.'));
+                        return;
+                    }
+
+                    $validate.prop('disabled', true);
+                    $error.prop('hidden', true);
+                    self._api('verify', { otp: code }).then(function () {
+                        window.clearInterval(timer);
+                        self._showView('progress');
+                        resolve();
+                    }, function (error) {
+                        $validate.prop('disabled', false);
+                        showError((error.data && error.data.message) ||
+                            $t('That code is not correct. Please check it and try again.'));
+                    });
+                });
+            });
+        },
+
+        /** The buyer gave up: cancel the order (and its contract), back to the cart. */
+        _cancel: function () {
+            var cart = waffyConfig().cartUrl || url.build('checkout/cart');
+
+            fullScreenLoader.startLoader();
+            this._api('cancel').then(function () {
+                window.location.replace(cart);
+            }, function () {
+                window.location.replace(cart);
+            });
+        },
+
+        _messageOf: function (error) {
+            if (typeof error === 'string') {
+                return error;
+            }
+            return (error && error.data && error.data.message) ||
+                $t('Waffy payment could not be initiated. Please try again or choose a different payment method.');
+        },
+
+        /** A step failed: say why, and offer to retry or give up. */
+        _fail: function (error) {
+            var self = this;
+
+            this._modalEl.find('[data-role="failure-message"]').text(this._messageOf(error));
+            this._showView('failure');
+            this._modalEl.find('[data-role="retry"]').off('click').on('click', function () {
+                self._run();
+            });
+            this._modalEl.find('[data-role="give-up"]').off('click').on('click', function () {
+                self._cancel();
+            });
+        },
+
+        // ── The modal ────────────────────────────────────────────────────────
+
+        /** Build (once) and open the modal in its loading state. */
+        _openModal: function () {
             var self = this;
 
             if (!this._modalEl) {
                 this._modalEl = $(
                     '<div class="waffy-disclaimer">' +
-                        '<p class="waffy-disclaimer__body" data-role="body">' +
-                            $t('To complete your order you will be taken to Waffy\'s secure escrow payment page.' +
-                               ' Once your payment is confirmed, you will be redirected back here to your order confirmation.') +
-                        '</p>' +
-                        '<div class="waffy-progress">' +
-                            '<div class="waffy-progress__track" role="progressbar"' +
-                                ' aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"' +
-                                ' aria-label="' + $t('Preparing your payment') + '">' +
-                                '<div class="waffy-progress__fill"></div>' +
+                        '<div data-view="progress">' +
+                            '<p class="waffy-disclaimer__body">' +
+                                $t('To complete your order you will be taken to Waffy\'s secure escrow payment page.' +
+                                   ' Once your payment is confirmed, you will be redirected back here to your order confirmation.') +
+                            '</p>' +
+                            '<div class="waffy-progress">' +
+                                '<div class="waffy-progress__track" role="progressbar"' +
+                                    ' aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"' +
+                                    ' aria-label="' + $t('Preparing your payment') + '">' +
+                                    '<div class="waffy-progress__fill"></div>' +
+                                '</div>' +
+                                '<ul class="waffy-progress__steps">' +
+                                    this._stepRow('contract', $t('Creating your escrow contract')) +
+                                    this._stepRow('consent', $t('Confirming your mobile number')) +
+                                    this._stepRow('payment', $t('Getting your payment page')) +
+                                '</ul>' +
                             '</div>' +
-                            '<span class="waffy-progress__percent">0%</span>' +
-                            (waffyConfig().isSandbox
-                                ? '<p class="waffy-progress__note">' +
-                                      $t('Sandbox mode — showing each Waffy API call.') +
-                                  '</p><ul class="waffy-progress__steps"></ul>'
-                                : '') +
                         '</div>' +
-                        '<div class="waffy-disclaimer__actions">' +
+                        '<form class="waffy-otp" data-view="otp" data-role="otp-form" autocomplete="off" hidden>' +
+                            '<p class="waffy-disclaimer__body">' +
+                                $t('Waffy sent a verification code to your mobile number. Enter it to continue.') +
+                            '</p>' +
+                            '<label class="waffy-otp__label" for="waffy-otp-code">' + $t('Verification code') + '</label>' +
+                            '<input id="waffy-otp-code" class="waffy-otp__code" data-role="otp-code"' +
+                                ' inputmode="numeric" autocomplete="one-time-code" dir="ltr" required>' +
+                            '<p class="waffy-otp__error" data-role="otp-error" role="alert" hidden></p>' +
+                            '<div class="waffy-otp__actions">' +
+                                '<button type="submit" class="action primary waffy-btn" data-role="otp-validate">' +
+                                    $t('Validate') + '</button>' +
+                                '<button type="button" class="action secondary" data-role="otp-resend">' +
+                                    $t('Resend code') + '</button>' +
+                                '<button type="button" class="action-link waffy-otp__cancel" data-role="otp-cancel">' +
+                                    $t('Cancel') + '</button>' +
+                            '</div>' +
+                        '</form>' +
+                        '<div class="waffy-failure" data-view="failure" hidden>' +
+                            '<p class="waffy-otp__error" data-role="failure-message" role="alert"></p>' +
+                            '<div class="waffy-otp__actions">' +
+                                '<button type="button" class="action primary waffy-btn" data-role="retry">' +
+                                    $t('Try again') + '</button>' +
+                                '<button type="button" class="action-link waffy-otp__cancel" data-role="give-up">' +
+                                    $t('Cancel and return to cart') + '</button>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="waffy-disclaimer__actions" data-view="progress">' +
                             '<button type="button" class="action primary waffy-btn waffy-disclaimer-continue" disabled>' +
                                 '<span data-role="label">' + $t('Continue to Waffy') + '</span>' +
                             '</button>' +
@@ -200,210 +376,67 @@ define([
                     modalClass: 'waffy-disclaimer-modal',
                     clickableOverlay: false,
                     keyEventHandlers: {},
-                    buttons: [] // no default "OK" footer button; our own button lives in the content
+                    buttons: [] // no default footer; our own buttons live in the content
                 });
 
                 this._continueBtn = this._modalEl.find('.waffy-disclaimer-continue');
                 this._continueBtn.on('click', function () {
-                    if (this.disabled) {
+                    if (this.disabled || !self._readyUrl) {
                         return;
                     }
-                    if (self._readyUrl) {
-                        fullScreenLoader.startLoader();
-                        window.location.replace(self._readyUrl);
-                    }
+                    fullScreenLoader.startLoader();
+                    window.location.replace(self._readyUrl);
                 });
             }
 
             // Reset to the loading state on every open.
             this._readyUrl = null;
-            this._continueBtn
-                .prop('disabled', true)
-                .addClass('-loading');
-            this._resetProgress();
+            this._continueBtn.prop('disabled', true).addClass('-loading');
+            this._showView('progress');
+            this._modalEl.find('.waffy-progress__step').attr('class', 'waffy-progress__step is-pending');
+            this._renderPercent();
             this._modalEl.modal('openModal');
-            this._startPolling();
+        },
+
+        _stepRow: function (id, label) {
+            return '<li class="waffy-progress__step is-pending" data-step="' + id + '">' +
+                '<span class="waffy-progress__mark" aria-hidden="true"></span>' +
+                '<span class="waffy-progress__label">' + label + '</span>' +
+            '</li>';
+        },
+
+        /** Show one of the modal's views: progress, otp or failure. */
+        _showView: function (view) {
+            this._modalEl.find('[data-view]').each(function () {
+                $(this).prop('hidden', $(this).attr('data-view') !== view);
+            });
+        },
+
+        _setStep: function (id, status) {
+            this._modalEl.find('[data-step="' + id + '"]').attr('class', 'waffy-progress__step is-' + status);
+            this._renderPercent();
+        },
+
+        /** The bar fills by the share of steps done. */
+        _renderPercent: function () {
+            var $steps = this._modalEl.find('.waffy-progress__step'),
+                pct = Math.round($steps.filter('.is-done').length / Math.max(1, $steps.length) * 100);
+
+            this._modalEl.find('.waffy-progress__fill').css('width', pct + '%');
+            this._modalEl.find('.waffy-progress__track').attr('aria-valuenow', pct);
         },
 
         /** Link is ready — enable the button so the buyer can proceed. */
         _setButtonReady: function () {
-            if (!this._continueBtn) {
-                return;
+            if (this._continueBtn) {
+                this._continueBtn.removeClass('-loading').prop('disabled', false);
             }
-
-            // The link exists, so every call has landed: fill the bar and settle
-            // any row still spinning, in case the last poll hasn't come back.
-            this._stopPolling();
-            this._renderProgress({ percent: 100, finalize: true });
-
-            this._continueBtn
-                .removeClass('-loading')
-                .prop('disabled', false);
         },
 
-        /** Close the disclaimer modal if it is open. */
         _closeModal: function () {
-            this._stopPolling();
             if (this._modalEl) {
                 this._modalEl.modal('closeModal');
             }
-        },
-
-        // ── Live progress ────────────────────────────────────────────────────
-
-        /** Clear the bar and the step rows so a retry doesn't inherit the old run. */
-        _resetProgress: function () {
-            this._stepRows = {};
-            this._modalEl.find('.waffy-progress__steps').empty();
-            this._renderProgress({ percent: 0 });
-        },
-
-        /**
-         * Poll Controller\Checkout\Progress until the run settles.
-         *
-         * The endpoint is deliberately session-free, which is what lets these
-         * polls return while the Start controller is still working — Magento
-         * holds the session lock for a whole request, so anything session-aware
-         * would queue up behind checkout and all arrive at the end.
-         */
-        _startPolling: function () {
-            var self = this,
-                interval = POLL_MIN_MS,
-                lastPercent = -1;
-
-            this._stopPolling();
-            this._polling = true;
-
-            function schedule() {
-                if (!self._polling) {
-                    return;
-                }
-                self._pollTimer = window.setTimeout(poll, interval);
-                interval = Math.min(POLL_MAX_MS, interval * POLL_BACKOFF);
-            }
-
-            function poll() {
-                if (!self._polling) {
-                    return;
-                }
-
-                $.ajax({
-                    url: waffyConfig().progressUrl || url.build('waffy/checkout/progress'),
-                    dataType: 'json',
-                    method: 'GET',
-                    cache: false
-                }).done(function (data) {
-                    if (!self._polling || !data) {
-                        schedule();
-                        return;
-                    }
-
-                    // Something moved — poll briskly again, so a long call
-                    // followed by three quick ones still feels live.
-                    if (data.percent !== lastPercent) {
-                        lastPercent = data.percent;
-                        interval = POLL_MIN_MS;
-                    }
-
-                    self._renderProgress(data);
-
-                    if (data.state === 'complete' || data.state === 'failed') {
-                        self._polling = false;
-                        return;
-                    }
-
-                    schedule();
-                }).fail(function () {
-                    // A dropped poll must never disturb a checkout that is
-                    // otherwise going fine — try again.
-                    schedule();
-                });
-            }
-
-            poll();
-        },
-
-        _stopPolling: function () {
-            this._polling = false;
-            if (this._pollTimer) {
-                window.clearTimeout(this._pollTimer);
-                this._pollTimer = null;
-            }
-        },
-
-        /** Paint one progress payload from the endpoint into the modal. */
-        _renderProgress: function (data) {
-            var self = this,
-                pct = Math.max(0, Math.min(100, data.percent || 0)),
-                $list = this._modalEl.find('.waffy-progress__steps');
-
-            this._modalEl.find('.waffy-progress__fill').css('width', pct + '%');
-            this._modalEl.find('.waffy-progress__percent').text(pct + '%');
-            this._modalEl.find('.waffy-progress__track').attr('aria-valuenow', pct);
-
-            if (!$list.length) {
-                return; // production: the bar only
-            }
-
-            if (data.finalize) {
-                $list.find('.waffy-progress__step').each(function () {
-                    var $row = $(this);
-                    if ($row.is('.is-running, .is-pending')) {
-                        $row.attr('class', 'waffy-progress__step is-done')
-                            .find('.waffy-progress__timing').text('');
-                    }
-                });
-            }
-
-            if (!data.steps) {
-                return;
-            }
-
-            this._stepRows = this._stepRows || {};
-
-            $.each(data.steps, function (i, step) {
-                var row = self._stepRows[step.id],
-                    timing = '';
-
-                if (!row) {
-                    row = $(
-                        '<li class="waffy-progress__step">' +
-                            '<span class="waffy-progress__mark" aria-hidden="true"></span>' +
-                            '<span class="waffy-progress__label"></span>' +
-                            '<span class="waffy-progress__timing"></span>' +
-                        '</li>'
-                    );
-                    row.find('.waffy-progress__label').text(step.label);
-                    $list.append(row);
-                    self._stepRows[step.id] = row;
-                }
-
-                if (step.status === 'cached') {
-                    // The point of the whole exercise: this call did not happen,
-                    // because the token was already cached.
-                    timing = $t('cached');
-                } else if (step.status === 'done' && typeof step.ms === 'number') {
-                    timing = Math.round(step.ms) + ' ms';
-                } else if (step.status === 'failed') {
-                    timing = $t('failed');
-                }
-
-                row.attr('class', 'waffy-progress__step is-' + step.status)
-                    .find('.waffy-progress__timing').text(timing);
-            });
-        },
-
-        /**
-         * Preparing the link failed — close the modal and surface the reason in
-         * the checkout message area so the buyer can retry or pick another
-         * method. The order remains as pending_payment.
-         */
-        _closeWithError: function (message) {
-            this._closeModal();
-            globalMessageList.addErrorMessage({
-                message: message ||
-                    $t('Waffy payment could not be initiated. Please try again or choose a different payment method.')
-            });
         }
     });
 });

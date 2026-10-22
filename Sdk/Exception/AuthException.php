@@ -14,12 +14,14 @@ class AuthException extends WaffyException
 {
     /**
      * @param array<string, mixed>|null $responseBody Decoded backend response body, when the failure carried one
+     * @param int                       $statusCode   HTTP status of the failed call; 0 when there was no response
      */
     public function __construct(
         string $message,
         public readonly ?array $responseBody = null,
         int $code = 0,
         ?Throwable $previous = null,
+        public readonly int $statusCode = 0,
     ) {
         parent::__construct($message, $code, $previous);
     }

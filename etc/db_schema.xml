@@ -21,4 +21,31 @@
         </constraint>
     </table>
 
+    <!--
+        Where each order stands in the step-by-step Waffy checkout. A table of its
+        own rather than the payment's additional_information: the page runs the
+        steps as parallel requests, and each writes only its own columns —
+        additional_information is one serialised column, so two saves would
+        overwrite each other.
+    -->
+    <table name="waffy_checkout" resource="default" engine="innodb" comment="Waffy checkout state per order">
+        <column xsi:type="int" name="order_id" unsigned="true" nullable="false" comment="sales_order.entity_id"/>
+        <column xsi:type="varchar" name="contract_id" nullable="true" length="64" comment="Waffy contract id"/>
+        <column xsi:type="varchar" name="milestone_id" nullable="true" length="64" comment="Waffy milestone id (= ext_order_id)"/>
+        <column xsi:type="varchar" name="short_id" nullable="true" length="64" comment="Contract short id — the ticket scope"/>
+        <!-- unknown | not_required | otp_sent | verified -->
+        <column xsi:type="varchar" name="consent_state" nullable="false" length="16" default="unknown" comment="Buyer consent state"/>
+        <column xsi:type="text" name="payment_url" nullable="true" comment="Start-payment URL, before the ticket"/>
+        <column xsi:type="text" name="ticket" nullable="true" comment="Payment ticket, encrypted"/>
+        <column xsi:type="smallint" name="cleanup_pending" unsigned="true" nullable="false" default="0" comment="Unpaid contract still to remove on Waffy"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="order_id"/>
+        </constraint>
+        <index referenceId="WAFFY_CHECKOUT_CLEANUP_PENDING" indexType="btree">
+            <column name="cleanup_pending"/>
+        </index>
+    </table>
+
 </schema>

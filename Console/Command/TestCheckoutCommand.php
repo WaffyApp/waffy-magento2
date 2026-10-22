@@ -9,10 +9,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Waffy\Ecommerce\Dto\CheckoutRequest;
+use Waffy\Ecommerce\Dto\CheckoutResult;
 use Waffy\Ecommerce\Dto\CustomerInfo;
 use Waffy\Ecommerce\Dto\MilestoneInfo;
 use Waffy\Ecommerce\Dto\Party;
 use Waffy\Ecommerce\Dto\ProductInfo;
+use Waffy\Ecommerce\Exception\WaffyException;
 use Waffy\Ecommerce\Support\PhoneNumber;
 use Waffy\Payment\Model\Config;
 use Waffy\Payment\Model\OrchestratorFactory;
@@ -20,8 +22,10 @@ use Waffy\Payment\Model\OrchestratorFactory;
 /**
  * ddev magento waffy:checkout:test [options]
  *
- * Tests the full 7-step SDK checkout flow using credentials from admin config.
- * Prints the resulting paymentUrl so you can open it in a browser.
+ * Drives the Waffy ID checkout step by step with the connection from the setup
+ * wizard, printing each result, and ends with the payment URL to open in a
+ * browser. When the buyer's consent is required it stops before the ticket:
+ * the OTP is collected by the checkout modal, not here.
  */
 class TestCheckoutCommand extends Command
 {
@@ -35,139 +39,84 @@ class TestCheckoutCommand extends Command
     protected function configure(): void
     {
         $this->setName('waffy:checkout:test')
-             ->setDescription('Test the Waffy SDK initiateCheckout() flow end-to-end.')
-             ->addOption('phone',    null, InputOption::VALUE_REQUIRED, 'Buyer phone (E.164)',       '+966555555555')
-             ->addOption('amount',   null, InputOption::VALUE_REQUIRED, 'Order amount (SAR)',         '50.00')
-             ->addOption('user-id',  null, InputOption::VALUE_REQUIRED, 'clientUserId for the buyer', 'test_buyer_001');
+             ->setDescription('Test the Waffy ID checkout steps end-to-end with the configured connection.')
+             ->addOption('phone',  null, InputOption::VALUE_REQUIRED, 'Buyer phone (E.164 or 05XXXXXXXX)', '+966555555555')
+             ->addOption('amount', null, InputOption::VALUE_REQUIRED, 'Order amount (SAR)', '50.00');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $phone    = (string) $input->getOption('phone');
-        $amount   = (float)  $input->getOption('amount');
-        $userId   = (string) $input->getOption('user-id');
+        $phone  = PhoneNumber::toE164((string) $input->getOption('phone'));
+        $amount = (float) $input->getOption('amount');
 
         $clientId     = $this->config->getClientId();
         $clientSecret = $this->config->getClientSecret();
-        $merchantPhone = $this->config->getMerchantPhone();
+        $adminMobile  = $this->config->getClientAdminEmail();
+        $orgAccountId = $this->config->getOrgAccountId();
 
-        if ($clientId === '' || $clientSecret === '') {
-            $output->writeln('<error>Client ID or Client Secret not configured. Go to Stores → Configuration → Payment Methods → Waffy.</error>');
-            return Command::FAILURE;
-        }
-        if ($merchantPhone === '') {
-            $output->writeln('<error>Merchant Phone not configured.</error>');
+        if ($clientId === '' || $clientSecret === '' || $adminMobile === '' || $orgAccountId === '') {
+            $output->writeln('<error>Waffy is not set up. Run the setup wizard: Stores → Waffy setup.</error>');
             return Command::FAILURE;
         }
 
-        $output->writeln('<info>Starting Waffy checkout test...</info>');
-        $output->writeln("  Client ID      : {$clientId}");
-        $output->writeln("  Buyer phone    : {$phone}");
-        $output->writeln("  Merchant phone : {$merchantPhone}");
-        $output->writeln("  Amount         : SAR {$amount}");
+        $output->writeln('<info>Waffy ID checkout test</info>');
+        $output->writeln('  Environment     : ' . $this->config->getEnvironment());
+        $output->writeln("  Client ID       : {$clientId}");
+        $output->writeln("  Org account     : {$orgAccountId}");
+        $output->writeln("  Buyer phone     : {$phone}");
+        $output->writeln("  Amount          : SAR {$amount}");
         $output->writeln('');
 
-        $clientAdminEmail    = $this->config->getClientAdminEmail();
-        $clientAdminPassword = $this->config->getClientAdminPassword();
-
-        if ($clientAdminEmail === '' || $clientAdminPassword === '') {
-            $output->writeln('<error>Client Admin Email or Password not configured. Go to Stores → Configuration → Payment Methods → Waffy.</error>');
-            return Command::FAILURE;
-        }
-
-        $request = new CheckoutRequest(
-            clientId:            $clientId,
-            clientSecret:        $clientSecret,
-            clientAdminEmail:    $clientAdminEmail,
-            clientAdminPassword: $clientAdminPassword,
-            customer: new CustomerInfo(
-                phoneNumber: $phone,
-                firstName:   'Test',
-                lastName:    'Buyer',
-            ),
-            product: new ProductInfo(
-                title:          'Test Order #SDK-001',
-                description:    'SDK test — 1x Test Product',
-                images:         [],
-                category:       $this->config->getCategory(),
-                returnPolicy:   $this->config->getReturnPolicy(),
-                returnFeePayee: $this->config->getReturnFeePayee(),
-            ),
-            milestone: MilestoneInfo::inDays(
-                amount: $amount,
-                days:   $this->config->getMilestoneDeadlineDays(),
-            ),
-            parties: Party::escrowSet(
-                buyerPhone:    $phone,
-                merchantPhone: $merchantPhone,
-                brokerPhone:   null,
-                amount:        $amount,
-            ),
-            redirectUrl: 'https://magento-test.ddev.site/waffy/checkout/return?order_id=SDK-TEST',
-            paymentType: $this->config->getPaymentType(),
-        );
-
         try {
+            $request = new CheckoutRequest(
+                clientId:            $clientId,
+                clientSecret:        $clientSecret,
+                clientAdminEmail:    $adminMobile,
+                clientAdminPassword: $this->config->getClientAdminPassword(),
+                customer:            new CustomerInfo(phoneNumber: $phone, firstName: 'Test', lastName: 'Buyer'),
+                product:             new ProductInfo(title: 'Test Order #SDK-001', description: 'SDK test — 1x Test Product'),
+                milestone:           MilestoneInfo::inDays(amount: $amount),
+                parties:             Party::escrowSet($phone, $orgAccountId, $amount),
+                redirectUrl:         'https://magento-test.ddev.site/waffy/checkout/return?order_id=SDK-TEST',
+                paymentType:         $this->config->getPaymentType(),
+            );
             $orchestrator = $this->orchestratorFactory->create();
 
-            // ── Step 1a: app token (client_credentials) ──────────────────────
-            $output->writeln('<comment>Step 1a: App Token (client_credentials)...</comment>');
-            $appToken = $orchestrator->fetchAppToken($clientId, $clientSecret);
-            $output->writeln('  appToken      : ' . substr($appToken, 0, 40) . '...');
+            $output->writeln('<comment>Link Customer…</comment>');
+            $registration = $orchestrator->partner->prepareCustomer($clientId, $clientSecret, $request->customer);
+            $output->writeln('  waffyUserId     : ' . $registration->waffyUserId);
+            $output->writeln('  consentRequired : ' . ($registration->consentRequired() ? 'yes' : 'no'));
 
-            // ── Step 1b: merchant token (admin password grant) ───────────────
-            $output->writeln('<comment>Step 1b: Merchant Token (admin login)...</comment>');
-            $merchantToken = $orchestrator->fetchMerchantToken(
-                $clientId,
-                $clientSecret,
-                $clientAdminEmail,
-                $clientAdminPassword,
-            );
-            $output->writeln('  merchantToken : ' . substr($merchantToken, 0, 40) . '...');
+            $output->writeln('<comment>Contract → milestone → parties…</comment>');
+            $contract = $orchestrator->prepareContract($request);
+            $output->writeln("  contractId      : {$contract->contractId}");
+            $output->writeln("  milestoneId     : {$contract->milestoneId}");
+            $output->writeln('  shortId         : ' . ($contract->shortId ?? '(none)'));
 
-            // ── Step 2: sign up ──────────────────────────────────────────────
-            $output->writeln('<comment>Step 2: Customer Sign-Up...</comment>');
-            $derivedClientUserId = $request->customer->clientUserId
-                ?? PhoneNumber::toClientUserId($request->customer->phoneNumber);
-            $output->writeln('  clientUserId  : ' . $derivedClientUserId);
-            $clientUserToken = $orchestrator->signUpCustomer(
-                $appToken,
-                $derivedClientUserId,
-                $request->customer->phoneNumber,
-                $request->customer->firstName,
-                $request->customer->lastName,
-            );
-            $output->writeln('  clientUserToken : ' . $clientUserToken);
+            $output->writeln('<comment>Start payment…</comment>');
+            $paymentUrl = $orchestrator->startPayment($request, $contract);
+            $output->writeln("  paymentUrl      : {$paymentUrl}");
 
-            // ── Step 3: customer login ───────────────────────────────────────
-            $output->writeln('<comment>Step 3: Customer Login (password grant)...</comment>');
-            $customerToken = $orchestrator->fetchCustomerToken(
-                $clientId,
-                $clientSecret,
-                $request->customer->phoneNumber,
-                $clientUserToken,
-            );
-            $output->writeln('  customerToken : ' . substr($customerToken, 0, 40) . '...');
+            if ($registration->consentRequired()) {
+                $output->writeln('');
+                $output->writeln('<comment>The buyer must consent first (OTP at checkout) — no ticket issued.</comment>');
+                $output->writeln('Open the payment URL above to pay with a live Waffy login instead.');
 
-            // ── Steps 4-7 via initiateCheckout ───────────────────────────────
-            $output->writeln('<comment>Steps 4–7: Contract → Milestone → Parties → Payment URL...</comment>');
-            $result = $this->orchestratorFactory->create()->initiateCheckout($request);
+                return Command::SUCCESS;
+            }
+
+            $output->writeln('<comment>Payment ticket…</comment>');
+            $ticket = $orchestrator->paymentTicket($request, $contract, $paymentUrl);
 
             $output->writeln('');
-            $output->writeln('<info>✓ Success!</info>');
-            $output->writeln('');
-            $output->writeln("  <comment>paymentUrl    :</comment> {$result->paymentUrl}");
-            $output->writeln("  <comment>customerToken :</comment> " . substr($result->customerToken, 0, 40) . '...');
-            $output->writeln("  <comment>contractId    :</comment> {$result->contractId}");
-            $output->writeln("  <comment>milestoneId   :</comment> {$result->milestoneId}");
-            $output->writeln('');
-            $output->writeln('<info>Open the paymentUrl in a browser to complete the payment flow.</info>');
+            $output->writeln('<info>✓ Success — open this URL in a browser to pay:</info>');
+            $output->writeln(CheckoutResult::withTicket($contract, $paymentUrl, $ticket)->paymentUrlWithBuyer());
 
             return Command::SUCCESS;
-
-        } catch (\Throwable $e) {
+        } catch (WaffyException $e) {
             $output->writeln('');
-            $output->writeln('<error>✗ ' . get_class($e) . ': ' . $e->getMessage() . '</error>');
+            $output->writeln('<error>✗ ' . get_class($e) . ': ' . ($e->getUserMessage() ?? $e->getMessage()) . '</error>');
+
             return Command::FAILURE;
         }
     }
