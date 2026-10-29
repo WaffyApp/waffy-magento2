@@ -3,11 +3,11 @@
 **Extension:** Waffy Escrow Payment for Magento 2
 **Composer package:** `waffy/module-payment`
 **Module name:** `Waffy_Payment`
-**Version:** 0.7.0
+**Version:** 0.7.1
 **License:** OSL-3.0
 
 Compatible with **Adobe Commerce (Cloud & on-premises) 2.4.x** and
-**Magento Open Source 2.4.x**, on **PHP 8.1+**.
+**Magento Open Source 2.4.x**, on **PHP 8.2+**.
 
 > The Waffy PHP SDK is **bundled inside this extension** (under `Sdk/`).
 > There is **no external Composer dependency** to add and nothing to fetch
@@ -20,7 +20,7 @@ Compatible with **Adobe Commerce (Cloud & on-premises) 2.4.x** and
 | Requirement | Value |
 |-------------|-------|
 | Magento / Adobe Commerce | 2.4.x |
-| PHP | 8.1 or higher |
+| PHP | 8.2 or higher (Magento 2.4.6 or later) |
 | PHP extensions | `ext-json`, `ext-openssl` (standard on any Magento host) |
 | Access | SSH / command-line access to the store (see note below) |
 | Waffy account | An organization in the Waffy portal (`portal-dev.waffyapp.com` for sandbox, `portal.waffyapp.com` for live) — the setup wizard walks you through it |
@@ -60,7 +60,7 @@ bin/magento setup:static-content:deploy -f
 bin/magento cache:flush
 ```
 
-> Pin an exact version if you prefer: `composer require waffy/module-payment:0.7.0`.
+> Pin an exact version if you prefer: `composer require waffy/module-payment:0.7.1`.
 >
 > **On Adobe Commerce Cloud:** run the `composer require` locally, then commit
 > `composer.json` + `composer.lock` and `git push`. The Cloud build/deploy
@@ -100,7 +100,7 @@ commit that file to Git**.
 Confirm the extension is listed under **My Profile → My Purchases**, then run:
 
 ```bash
-composer require waffy/module-payment:0.7.0
+composer require waffy/module-payment:0.7.1
 bin/magento module:enable Waffy_Payment
 bin/magento setup:upgrade
 bin/magento setup:di:compile
@@ -133,7 +133,7 @@ https://github.com/WaffyApp/waffy-magento2/releases/latest/download/waffy-module
 ```bash
 # From the Magento root
 mkdir -p app/code/Waffy/Payment
-unzip waffy-module-payment-0.7.0.zip -d app/code/Waffy/Payment
+unzip waffy-module-payment-0.7.1.zip -d app/code/Waffy/Payment
 
 bin/magento module:enable Waffy_Payment
 bin/magento setup:upgrade

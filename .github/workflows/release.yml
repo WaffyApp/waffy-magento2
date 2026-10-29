@@ -7,7 +7,7 @@
 # leaves Magento unable to find the module. waffy-module-payment-<version>.zip
 # built here is the only correct download.
 #
-#   git tag v0.7.0 && git push origin v0.7.0
+#   git tag v0.7.1 && git push origin v0.7.1
 name: Release
 
 on:
@@ -28,7 +28,7 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          php-version: '8.2'
           extensions: json, openssl
           tools: composer:v2
 
