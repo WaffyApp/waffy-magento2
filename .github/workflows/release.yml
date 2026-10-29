@@ -7,7 +7,7 @@
 # leaves Magento unable to find the module. waffy-module-payment-<version>.zip
 # built here is the only correct download.
 #
-#   git tag v0.7.1 && git push origin v0.7.1
+#   git tag v0.7.2 && git push origin v0.7.2
 name: Release
 
 on:

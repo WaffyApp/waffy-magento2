@@ -3,7 +3,7 @@
 **Extension:** [Waffy Escrow Payment](https://commercemarketplace.adobe.com/waffy-module-payment.html)
 **Composer package:** `waffy/module-payment`
 **Module name:** `Waffy_Payment`
-**Latest version:** 0.7.1
+**Latest version:** 0.7.2
 **Price:** Free
 **Works with:** Adobe Commerce (Cloud & on-premises) and Magento Open Source 2.4.4 or later, PHP 8.1+
 
@@ -81,7 +81,7 @@ From the Magento root folder:
 
 ```bash
 # 1. Download the extension
-composer require waffy/module-payment:0.7.1
+composer require waffy/module-payment:0.7.2
 
 # 2. Enable it and register it with Magento
 bin/magento module:enable Waffy_Payment --clear-static-content
@@ -101,7 +101,7 @@ Notes:
 - `setup:static-content:deploy -f` is only needed in **production** mode. Run
   `bin/magento deploy:mode:show` if you are unsure which mode you are in.
 - To always take the newest release instead of pinning a version, use
-  `composer require waffy/module-payment` with no `:0.7.1` suffix.
+  `composer require waffy/module-payment` with no `:0.7.2` suffix.
 
 ### On Adobe Commerce Cloud
 
@@ -110,7 +110,7 @@ them for you.
 
 ```bash
 # In your local clone of the Cloud project, on an integration branch
-composer require waffy/module-payment:0.7.1
+composer require waffy/module-payment:0.7.2
 
 git add composer.json composer.lock
 git commit -m "Add Waffy Escrow Payment extension"
