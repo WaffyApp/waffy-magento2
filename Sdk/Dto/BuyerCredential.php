@@ -13,11 +13,11 @@ namespace Waffy\Ecommerce\Dto;
  *
  * param — `userTokenUrl` on AuthMode::Legacy, `ticket` on AuthMode::Keycloak.
  */
-readonly class BuyerCredential
+class BuyerCredential
 {
     public function __construct(
-        public string $param,
-        public string $value,
+        public readonly string $param,
+        public readonly string $value,
     ) {
     }
 }

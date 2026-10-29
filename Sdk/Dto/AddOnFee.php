@@ -14,15 +14,15 @@ namespace Waffy\Ecommerce\Dto;
  * type        — EXTRA_AMOUNT (most common for platform fees).
  * feeType     — FLAT (fixed SAR amount) or PERCENTAGE.
  */
-readonly class AddOnFee
+class AddOnFee
 {
     public function __construct(
-        public float $amount,
-        public string $description,
-        public string $beneficiary,
-        public string $payee,
-        public string $type = 'EXTRA_AMOUNT',
-        public string $feeType = 'FLAT',
+        public readonly float $amount,
+        public readonly string $description,
+        public readonly string $beneficiary,
+        public readonly string $payee,
+        public readonly string $type = 'EXTRA_AMOUNT',
+        public readonly string $feeType = 'FLAT',
     ) {
     }
 

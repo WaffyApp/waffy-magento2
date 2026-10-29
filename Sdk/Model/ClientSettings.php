@@ -16,12 +16,12 @@ namespace Waffy\Ecommerce\Model;
  *                     'ticket', 'hint' (phone login_hint) or 'any'; kept as-is
  *                     when Waffy returns a mode this SDK does not know yet.
  */
-readonly class ClientSettings
+class ClientSettings
 {
     public function __construct(
-        public string $clientId,
-        public bool $autoAcceptConsent,
-        public ?string $checkoutLoginMode,
+        public readonly string $clientId,
+        public readonly bool $autoAcceptConsent,
+        public readonly ?string $checkoutLoginMode,
     ) {
     }
 

@@ -15,18 +15,18 @@ use Waffy\Ecommerce\Exception\ValidationException;
  * returnFeePayee — PROVIDER | CUSTOMER (who pays return shipping; default: PROVIDER)
  * category       — free-text category, e.g. "Electronics", "Services", "Clothing"
  */
-readonly class ProductInfo
+class ProductInfo
 {
     /**
      * @param string[] $images Image URLs (max recommended: 5)
      */
     public function __construct(
-        public string $title,
-        public string $description,
-        public array $images = [],
-        public string $category = 'Services',
-        public string $returnPolicy = 'NO_RETURN',
-        public string $returnFeePayee = 'PROVIDER',
+        public readonly string $title,
+        public readonly string $description,
+        public readonly array $images = [],
+        public readonly string $category = 'Services',
+        public readonly string $returnPolicy = 'NO_RETURN',
+        public readonly string $returnFeePayee = 'PROVIDER',
     ) {
         if (trim($title) === '') {
             throw new ValidationException('ProductInfo: title cannot be empty.');

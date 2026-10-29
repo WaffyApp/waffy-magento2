@@ -18,19 +18,19 @@ namespace Waffy\Ecommerce\Model;
  *                     Waffy adds later is kept as-is rather than dropped.
  * retryAfterSeconds — set with RECENTLY_SENT: the per-buyer cooldown is 60 seconds.
  */
-readonly class ConsentLinkResult
+class ConsentLinkResult
 {
     public function __construct(
-        public bool $sent,
-        public ?string $reason,
-        public int|float|null $retryAfterSeconds,
+        public readonly bool $sent,
+        public readonly ?string $reason,
+        public readonly int|float|null $retryAfterSeconds,
     ) {
     }
 
     /** @param array<string, mixed> $body */
     public static function fromResponse(array $body): self
     {
-        $reason     = $body['reason']                ?? null;
+        $reason     = $body['reason']            ?? null;
         $retryAfter = $body['retryAfterSeconds'] ?? null;
 
         return new self(

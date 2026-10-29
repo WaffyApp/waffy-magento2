@@ -16,12 +16,12 @@ use Waffy\Ecommerce\Model\WebhookStatus;
  * {@see forEvent()} and then translate {@see $action} into their own order
  * state and persist the comments however the platform does it.
  */
-readonly class WebhookOutcome
+class WebhookOutcome
 {
     public function __construct(
-        public OrderAction $action,
-        public string $adminComment,
-        public string $customerComment,
+        public readonly OrderAction $action,
+        public readonly string $adminComment,
+        public readonly string $customerComment,
     ) {
     }
 

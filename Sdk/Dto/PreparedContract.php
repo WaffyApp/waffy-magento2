@@ -15,12 +15,12 @@ namespace Waffy\Ecommerce\Dto;
  *               create-milestone response; null on a backend that does not
  *               return it, in which case it is taken from the payment URL.
  */
-readonly class PreparedContract
+class PreparedContract
 {
     public function __construct(
-        public string $contractId,
-        public string $milestoneId,
-        public ?string $shortId = null,
+        public readonly string $contractId,
+        public readonly string $milestoneId,
+        public readonly ?string $shortId = null,
     ) {
     }
 }

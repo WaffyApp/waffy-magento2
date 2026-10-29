@@ -18,16 +18,16 @@ use Waffy\Ecommerce\Support\PhoneNumber;
  * amount   — the SAR amount this party is responsible for / receives.
  * isSender — true when this party initiates the payment (the PROVIDER).
  */
-readonly class Party
+class Party
 {
     private const VALID_ROLES = ['CUSTOMER', 'PROVIDER'];
 
     public function __construct(
-        public ?string $phoneNumber,
-        public string $role,
-        public float $amount,
-        public bool $isSender = false,
-        public ?string $userId = null,
+        public readonly ?string $phoneNumber,
+        public readonly string $role,
+        public readonly float $amount,
+        public readonly bool $isSender = false,
+        public readonly ?string $userId = null,
     ) {
         if (!in_array($role, self::VALID_ROLES, true)) {
             throw new ValidationException(

@@ -12,13 +12,13 @@ namespace Waffy\Ecommerce\Model;
  * `linked: false` — the lookup never reveals whether the buyer exists
  * elsewhere.
  */
-readonly class ConsentLookup
+class ConsentLookup
 {
     public function __construct(
-        public bool $linked,
-        public ?string $status,
-        public ?string $type,
-        public bool $required,
+        public readonly bool $linked,
+        public readonly ?string $status,
+        public readonly ?string $type,
+        public readonly bool $required,
     ) {
     }
 

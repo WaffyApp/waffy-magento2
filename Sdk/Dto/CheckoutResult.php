@@ -24,17 +24,17 @@ use Waffy\Ecommerce\Model\CustomerConsent;
  * consent         — AuthMode::Keycloak only: the buyer's consent when they were
  *                   registered for this checkout. Null on AuthMode::Legacy.
  */
-readonly class CheckoutResult
+class CheckoutResult
 {
-    public BuyerCredential $buyerCredential;
+    public readonly BuyerCredential $buyerCredential;
 
     public function __construct(
-        public string $paymentUrl,
-        public string $customerToken,
-        public string $contractId,
-        public string $milestoneId,
+        public readonly string $paymentUrl,
+        public readonly string $customerToken,
+        public readonly string $contractId,
+        public readonly string $milestoneId,
         ?BuyerCredential $buyerCredential = null,
-        public ?CustomerConsent $consent = null,
+        public readonly ?CustomerConsent $consent = null,
     ) {
         $this->buyerCredential = $buyerCredential ?? new BuyerCredential('userTokenUrl', $customerToken);
     }

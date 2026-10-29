@@ -14,11 +14,11 @@ namespace Waffy\Ecommerce\Model;
  * Rate limits (429), a bad phone (400) and a failed dispatch (502) are not
  * `sent: false` — they surface as an AuthException carrying getUserMessage().
  */
-readonly class OtpSendResult
+class OtpSendResult
 {
     public function __construct(
-        public bool $sent,
-        public ?string $reason,
+        public readonly bool $sent,
+        public readonly ?string $reason,
     ) {
     }
 

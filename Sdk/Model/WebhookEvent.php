@@ -19,17 +19,17 @@ use Waffy\Ecommerce\Exception\WebhookException;
  * Unknown status strings resolve to a null `status` so adapters can log and
  * ignore them rather than crashing. The full decoded payload is kept in `raw`.
  */
-readonly class WebhookEvent
+class WebhookEvent
 {
     /**
      * @param array<string, mixed> $raw The full decoded payload
      */
     public function __construct(
-        public string $contractId,
-        public ?WebhookStatus $status,
-        public string $rawStatus,
-        public string $referenceId,
-        public array $raw,
+        public readonly string $contractId,
+        public readonly ?WebhookStatus $status,
+        public readonly string $rawStatus,
+        public readonly string $referenceId,
+        public readonly array $raw,
     ) {
     }
 

@@ -25,17 +25,17 @@ namespace Waffy\Ecommerce\Model;
  * linkSent   — the signed-link SMS was accepted for sending on this call
  *              (consentMethod 'sms' only).
  */
-readonly class CustomerConsent
+class CustomerConsent
 {
     public const STATUSES = ['PENDING', 'VERIFIED', 'REJECTED'];
     public const TYPES    = ['CUSTOMER_APPROVED', 'AUTO_CONTRACTUAL', 'LIVE_OTP_VERIFIED'];
 
     public function __construct(
-        public ?string $status,
-        public ?string $type,
-        public bool $required,
-        public bool $autoAccept,
-        public bool $linkSent,
+        public readonly ?string $status,
+        public readonly ?string $type,
+        public readonly bool $required,
+        public readonly bool $autoAccept,
+        public readonly bool $linkSent,
     ) {
     }
 

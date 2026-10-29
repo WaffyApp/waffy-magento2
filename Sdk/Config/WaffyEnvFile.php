@@ -28,7 +28,7 @@ use Waffy\Ecommerce\Support\PhoneNumber;
  * is a sandbox host; anything else is live. Values for one environment are
  * refused when the merchant selected the other.
  */
-readonly class WaffyEnvFile
+class WaffyEnvFile
 {
     public const REQUIRED_KEYS = [
         'id_base_url',
@@ -42,16 +42,16 @@ readonly class WaffyEnvFile
     public const URL_KEYS = ['id_base_url', 'auth_base_url', 'api_base_url'];
 
     public function __construct(
-        public Environment $environment,
-        public string $idBaseUrl,
-        public string $authBaseUrl,
-        public string $apiBaseUrl,
-        public string $clientId,
-        public string $adminUsername,
-        public string $orgAccountId,
-        public ?string $organizationCode = null,
-        public ?string $clientSecret = null,
-        public ?string $adminPassword = null,
+        public readonly Environment $environment,
+        public readonly string $idBaseUrl,
+        public readonly string $authBaseUrl,
+        public readonly string $apiBaseUrl,
+        public readonly string $clientId,
+        public readonly string $adminUsername,
+        public readonly string $orgAccountId,
+        public readonly ?string $organizationCode = null,
+        public readonly ?string $clientSecret = null,
+        public readonly ?string $adminPassword = null,
     ) {
     }
 

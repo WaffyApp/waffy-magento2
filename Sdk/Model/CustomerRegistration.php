@@ -10,12 +10,12 @@ namespace Waffy\Ecommerce\Model;
  * waffyUserId and userIdentification are Waffy's two ids for the buyer.
  * consent is null only on a Waffy ID build that predates the field.
  */
-readonly class CustomerRegistration
+class CustomerRegistration
 {
     public function __construct(
-        public string $waffyUserId,
-        public ?string $userIdentification,
-        public ?CustomerConsent $consent,
+        public readonly string $waffyUserId,
+        public readonly ?string $userIdentification,
+        public readonly ?CustomerConsent $consent,
     ) {
     }
 

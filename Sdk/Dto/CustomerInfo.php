@@ -16,15 +16,15 @@ use Waffy\Ecommerce\Support\PhoneNumber;
  * email         — optional. Sent only to Waffy ID (AuthMode::Keycloak) registration,
  *                 which accepts it; the legacy sign-up payload never carries it.
  */
-readonly class CustomerInfo
+class CustomerInfo
 {
     public function __construct(
-        public string $phoneNumber,
-        public string $firstName,
-        public string $lastName,
-        public ?string $clientUserId = null,
-        public ?string $password = null,
-        public ?string $email = null,
+        public readonly string $phoneNumber,
+        public readonly string $firstName,
+        public readonly string $lastName,
+        public readonly ?string $clientUserId = null,
+        public readonly ?string $password = null,
+        public readonly ?string $email = null,
     ) {
         if (!PhoneNumber::isValidE164($phoneNumber)) {
             throw new ValidationException(

@@ -27,23 +27,23 @@ use Waffy\Ecommerce\Exception\ValidationException;
  *                      null sends nothing, which is what an org with
  *                      auto-accept-consent wants. Ignored on AuthMode::Legacy.
  */
-readonly class CheckoutRequest
+class CheckoutRequest
 {
     /**
      * @param Party[] $parties At minimum: one CUSTOMER and one PROVIDER.
      */
     public function __construct(
-        public string $clientId,
-        public string $clientSecret,
-        public string $clientAdminEmail,
-        public string $clientAdminPassword,
-        public CustomerInfo $customer,
-        public ProductInfo $product,
-        public MilestoneInfo $milestone,
-        public array $parties,
-        public string $redirectUrl,
-        public string $paymentType = 'PURCHASE',
-        public ?string $consentMethod = null,
+        public readonly string $clientId,
+        public readonly string $clientSecret,
+        public readonly string $clientAdminEmail,
+        public readonly string $clientAdminPassword,
+        public readonly CustomerInfo $customer,
+        public readonly ProductInfo $product,
+        public readonly MilestoneInfo $milestone,
+        public readonly array $parties,
+        public readonly string $redirectUrl,
+        public readonly string $paymentType = 'PURCHASE',
+        public readonly ?string $consentMethod = null,
     ) {
         if (trim($clientId) === '') {
             throw new ValidationException('CheckoutRequest: clientId cannot be empty.');

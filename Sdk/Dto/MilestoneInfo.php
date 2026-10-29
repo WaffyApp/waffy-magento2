@@ -18,7 +18,7 @@ use Waffy\Ecommerce\Exception\ValidationException;
  *             on-demand purchases (e.g. +30 days from now).
  * addOnFees — optional platform fees added on top of the base itemPrice.
  */
-readonly class MilestoneInfo
+class MilestoneInfo
 {
     /**
      * Days until the milestone's `deadLine` when the platform does not choose.
@@ -31,10 +31,10 @@ readonly class MilestoneInfo
      * @param AddOnFee[] $addOnFees
      */
     public function __construct(
-        public float $amount,
-        public string $deadline,
-        public string $currency = 'SAR',
-        public array $addOnFees = [],
+        public readonly float $amount,
+        public readonly string $deadline,
+        public readonly string $currency = 'SAR',
+        public readonly array $addOnFees = [],
     ) {
         if ($amount <= 0) {
             throw new ValidationException('MilestoneInfo: amount must be greater than zero.');
