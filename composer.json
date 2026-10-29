@@ -7,7 +7,7 @@
     "keywords": ["waffy", "escrow", "payment", "magento2", "mage-os"],
     "homepage": "https://github.com/WaffyApp/waffy-magento2",
     "require": {
-        "php": "^8.2",
+        "php": "^8.1",
         "ext-json": "*",
         "ext-openssl": "*",
         "magento/framework": ">=103.0 <104",

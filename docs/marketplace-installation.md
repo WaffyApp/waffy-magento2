@@ -5,7 +5,7 @@
 **Module name:** `Waffy_Payment`
 **Latest version:** 0.7.1
 **Price:** Free
-**Works with:** Adobe Commerce (Cloud & on-premises) and Magento Open Source 2.4.6 or later, PHP 8.2+
+**Works with:** Adobe Commerce (Cloud & on-premises) and Magento Open Source 2.4.4 or later, PHP 8.1+
 
 ---
 

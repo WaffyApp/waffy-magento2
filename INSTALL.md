@@ -7,7 +7,7 @@
 **License:** OSL-3.0
 
 Compatible with **Adobe Commerce (Cloud & on-premises) 2.4.x** and
-**Magento Open Source 2.4.x**, on **PHP 8.2+**.
+**Magento Open Source 2.4.x**, on **PHP 8.1+**.
 
 > The Waffy PHP SDK is **bundled inside this extension** (under `Sdk/`).
 > There is **no external Composer dependency** to add and nothing to fetch
@@ -20,7 +20,7 @@ Compatible with **Adobe Commerce (Cloud & on-premises) 2.4.x** and
 | Requirement | Value |
 |-------------|-------|
 | Magento / Adobe Commerce | 2.4.x |
-| PHP | 8.2 or higher (Magento 2.4.6 or later) |
+| PHP | 8.1 or higher |
 | PHP extensions | `ext-json`, `ext-openssl` (standard on any Magento host) |
 | Access | SSH / command-line access to the store (see note below) |
 | Waffy account | An organization in the Waffy portal (`portal-dev.waffyapp.com` for sandbox, `portal.waffyapp.com` for live) — the setup wizard walks you through it |

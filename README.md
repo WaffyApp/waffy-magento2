@@ -35,7 +35,7 @@ extra dependencies to install).
 |---|---|
 | Adobe Commerce (Cloud & on-premises) | 2.4.x |
 | Magento Open Source | 2.4.x |
-| PHP | 8.2+ |
+| PHP | 8.1+ |
 
 ## Installation
 
