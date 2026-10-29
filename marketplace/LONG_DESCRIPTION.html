@@ -7,10 +7,10 @@
   <li>Escrow-backed checkout — Waffy appears alongside your other payment methods. The buyer pays on Waffy's secure hosted payment page, and funds are held in escrow rather than transferred immediately.</li>
   <li>Automatic order status updates — a webhook receiver moves the Magento order to Processing when payment is secured in escrow, and to Complete when the escrow is settled and funds are released. No manual reconciliation.</li>
   <li>Step-by-step setup — a three-step wizard under Stores > Waffy setup: create your client in the Waffy portal, upload its environment file, and verify. The wizard registers your webhook with Waffy for you.</li>
-  <li>Sandbox environment — run complete test orders against Waffy's sandbox before switching a single setting to production.</li>
+  <li>Sandbox environment — run complete test orders against Waffy's sandbox, then go live by connecting a live client through the same wizard.</li>
   <li>Buyer consent built in — when Waffy needs the shopper's consent, checkout asks for a one-time code sent to their phone, in the same window.</li>
   <li>Fast checkout — authentication tokens are cached in encrypted form and refreshed by a background cron job, so the shopper waits on the order call only, not on authentication. A live progress indicator keeps them informed while the escrow contract is created.</li>
-  <li>Multi-store aware — credentials and contract settings are configurable per website and per store view.</li>
+  <li>One connection, every store view — the Waffy connection is set up once for the installation, and the checkout title can be changed per website and per store view.</li>
   <li>Observable — every call to Waffy is written to the Magento system log with its outcome and duration, so support questions are answerable from the log alone.</li>
   <li>Self-contained — the Waffy PHP SDK ships inside the extension. No additional libraries, and no separate service to deploy.</li>
 </ul>
@@ -42,16 +42,16 @@
 <p>Because every cardholder-data function — capture, transmission, processing and storage — is fully outsourced to Waffy, and because the merchant's Magento server neither receives nor stores cardholder data, a merchant using this extension for e-commerce payments falls under PCI DSS Self-Assessment Questionnaire A (SAQ A), the shortest validation path available to e-commerce merchants. This is the SAQ level defined for merchants who redirect shoppers to a PCI DSS validated third-party payment page. The extension is designed specifically so that installing it does not push a store into SAQ A-EP or SAQ D: no cardholder data element is ever placed within the merchant's cardholder data environment.</p>
 
 <h3>What the extension does transmit to Waffy</h3>
-<p>To create the escrow contract, the extension sends the order reference, the order total and currency, the item names and quantities, the store name, the escrow contract parameters you configured, and the buyer's first name, last name and mobile number in E.164 format. This is order and contact information required to establish the escrow contract. It contains no cardholder data and no authentication credentials belonging to the shopper.</p>
+<p>To create the escrow contract, the extension sends the order reference, the order total and currency, the item names and quantities, the store name, the escrow contract terms (fixed by the extension), and the buyer's first name, last name and mobile number in E.164 format. This is order and contact information required to establish the escrow contract. It contains no cardholder data and no authentication credentials belonging to the shopper.</p>
 
 <h3>Transport security</h3>
-<p>All communication with Waffy — authentication, escrow-contract creation, and the redirect to the payment page — uses HTTPS with TLS certificate verification enabled. Endpoints are fixed to Waffy's own hosts (auth.waffyapp.com and api.waffyapp.com in production, and the equivalent sandbox hosts in sandbox mode). Plain HTTP is not used anywhere in the payment flow.</p>
+<p>All communication with Waffy — authentication, escrow-contract creation, and the redirect to the payment page — uses HTTPS with TLS certificate verification enabled. Endpoints are fixed to Waffy's own hosts (id.waffyapp.com, auth.waffyapp.com and api.waffyapp.com in production, and the equivalent sandbox hosts in sandbox mode). Plain HTTP is not used anywhere in the payment flow.</p>
 
 <h3>Credential storage</h3>
 <p>Your Waffy API Client Secret and admin password are encrypted with Magento's own encryption key before they are stored — in core_config_data once active, and in an encrypted draft while you are still setting up — and the setup wizard never shows them back. They are never rendered to the storefront, never exposed in JavaScript, and never written to the log.</p>
 
 <h3>Webhook endpoint hardening</h3>
-<p>The inbound webhook endpoint accepts POST only, and an optional IP allowlist (exact IPv4 or IPv6 addresses, or IPv4 CIDR ranges) restricts which origins may reach it. Non-matching requests are rejected with HTTP 403 before the payload is read. A webhook can only affect the one Magento order whose stored Waffy milestone identifier matches the payload; an unrecognised identifier is rejected and changes nothing. The endpoint moves an order forward through the payment lifecycle only. It cannot capture funds, issue a refund, alter order totals, or modify customer records.</p>
+<p>The inbound webhook endpoint accepts POST only. A webhook can only affect the one Magento order whose stored Waffy milestone identifier matches the payload; an unrecognised identifier is rejected and changes nothing. The endpoint moves an order forward through the payment lifecycle only. It cannot capture funds, issue a refund, alter order totals, or modify customer records.</p>
 
 <h3>Logging</h3>
 <p>The extension logs the sequence and outcome of its Waffy calls to Magento's system log for supportability. Those log entries carry no cardholder data, because none exists on the server to log, and API secrets are excluded from them.</p>
