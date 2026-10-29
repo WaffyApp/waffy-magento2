@@ -5,7 +5,7 @@
 **Module name:** `Waffy_Payment`
 **Latest version:** 0.7.1
 **Price:** Free
-**Works with:** Adobe Commerce (Cloud & on-premises) 2.4.x, Magento Open Source 2.4.x, PHP 8.2+
+**Works with:** Adobe Commerce (Cloud & on-premises) and Magento Open Source 2.4.6 or later, PHP 8.2+
 
 ---
 
@@ -213,7 +213,7 @@ bin/magento cache:flush
 |---|---|
 | `composer require` returns a 401 / authentication error | Your access keys are wrong or missing. Re-run Step 3, using the **public** key as the username and the **private** key as the password. |
 | `Could not find a matching version of package waffy/module-payment` | The extension is not linked to your account yet — complete the free checkout in Step 1, then retry. |
-| Waffy does not appear at checkout | Check **Enabled = Yes**, that the customer's country is allowed under **Payment from Applicable Countries**, and run `bin/magento cache:flush`. |
+| Waffy does not appear at checkout | Run the checks in **Stores → Waffy setup** — the payment method is enabled only once every check passes. Then confirm **Enabled = Yes** and run `bin/magento cache:flush`. |
 | Order status never updates after payment | The webhook is not registered. Re-run the checks in **Stores → Waffy setup** — the last one registers the webhook URL with Waffy. |
 | Errors about missing classes after installing | Re-run `bin/magento setup:di:compile` then `bin/magento cache:flush`. |
 | Checkout is slow on the first order | Magento cron is not running, so tokens are fetched during checkout. Set up cron and the warm-up job handles it. |
@@ -221,7 +221,7 @@ bin/magento cache:flush
 To see what the extension is doing, check the store log:
 
 ```bash
-grep "Waffy: checkout step" var/log/system.log | tail -20
+grep "Waffy: checkout" var/log/system.log | tail -20
 ```
 
 ---
