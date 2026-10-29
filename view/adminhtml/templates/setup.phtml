@@ -97,10 +97,10 @@ $tabs        = [
                     <input id="waffy-env-file" type="file" accept=".json,application/json" required>
                     <div id="waffy-env-preview" class="waffy-setup__preview" aria-live="polite"></div>
                     <label for="waffy-file-secret"><?= $escaper->escapeHtml(__('Client secret')) ?></label>
-                    <input id="waffy-file-secret" name="clientSecret" type="password" autocomplete="off"<?= $required ?>>
+                    <input id="waffy-file-secret" name="clientSecret" type="password" autocomplete="off"<?= /* @noEscape */ $required ?>>
                     <?= /* @noEscape */ $secretHint ?>
                     <label for="waffy-file-password"><?= $escaper->escapeHtml(__('Admin password')) ?></label>
-                    <input id="waffy-file-password" name="adminPassword" type="password" autocomplete="off"<?= $required ?>>
+                    <input id="waffy-file-password" name="adminPassword" type="password" autocomplete="off"<?= /* @noEscape */ $required ?>>
                     <?= /* @noEscape */ $secretHint ?>
                     <button type="submit" class="action-primary"><?= $escaper->escapeHtml(__('Save')) ?></button>
                 </fieldset>
@@ -121,10 +121,10 @@ $tabs        = [
                     <input id="waffy-account" name="orgAccountId" inputmode="numeric" required
                            value="<?= $escaper->escapeHtmlAttr($saved?->orgAccountId ?? '') ?>">
                     <label for="waffy-manual-secret"><?= $escaper->escapeHtml(__('Client secret')) ?></label>
-                    <input id="waffy-manual-secret" name="clientSecret" type="password" autocomplete="off"<?= $required ?>>
+                    <input id="waffy-manual-secret" name="clientSecret" type="password" autocomplete="off"<?= /* @noEscape */ $required ?>>
                     <?= /* @noEscape */ $secretHint ?>
                     <label for="waffy-manual-password"><?= $escaper->escapeHtml(__('Admin password')) ?></label>
-                    <input id="waffy-manual-password" name="adminPassword" type="password" autocomplete="off"<?= $required ?>>
+                    <input id="waffy-manual-password" name="adminPassword" type="password" autocomplete="off"<?= /* @noEscape */ $required ?>>
                     <?= /* @noEscape */ $secretHint ?>
                     <details>
                         <summary><?= $escaper->escapeHtml(__('Advanced: Waffy addresses')) ?></summary>
