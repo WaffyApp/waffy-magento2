@@ -23,7 +23,8 @@ readonly class AddOnFee
         public string $payee,
         public string $type = 'EXTRA_AMOUNT',
         public string $feeType = 'FLAT',
-    ) {}
+    ) {
+    }
 
     /** @return array<string, mixed> */
     public function toArray(): array

@@ -26,11 +26,11 @@ enum WebhookStatus: string
 {
     // ── Confirmed from live webhooks ────────────────────────────────────────
     /** Buyer's funds are secured in escrow (not yet released). Payment secured. */
-    case PARTIALLY_PAID      = 'PARTIALLY_PAID';
+    case PARTIALLY_PAID = 'PARTIALLY_PAID';
     /** Buyer accepted the delivered item; triggers release of funds. */
-    case ITEM_ACCEPTED       = 'ITEM_ACCEPTED';
+    case ITEM_ACCEPTED = 'ITEM_ACCEPTED';
     /** Settlement done — merchant cash-out approved, funds released. Terminal success. */
-    case CASH_OUT_APPROVED   = 'CASH_OUT_APPROVED';
+    case CASH_OUT_APPROVED = 'CASH_OUT_APPROVED';
 
     // ── Assumed (pre-2026-08-03), retained pending backend confirmation ─────
     case CREATED             = 'CREATED';

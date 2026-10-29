@@ -28,7 +28,7 @@ namespace Waffy\Ecommerce\Model;
 readonly class CustomerConsent
 {
     public const STATUSES = ['PENDING', 'VERIFIED', 'REJECTED'];
-    public const TYPES = ['CUSTOMER_APPROVED', 'AUTO_CONTRACTUAL', 'LIVE_OTP_VERIFIED'];
+    public const TYPES    = ['CUSTOMER_APPROVED', 'AUTO_CONTRACTUAL', 'LIVE_OTP_VERIFIED'];
 
     public function __construct(
         public ?string $status,
@@ -52,8 +52,8 @@ readonly class CustomerConsent
             return null;
         }
 
-        $status = in_array($value['status'] ?? null, self::STATUSES, true) ? $value['status'] : null;
-        $type = in_array($value['type'] ?? null, self::TYPES, true) ? $value['type'] : null;
+        $status   = in_array($value['status'] ?? null, self::STATUSES, true) ? $value['status'] : null;
+        $type     = in_array($value['type'] ?? null, self::TYPES, true) ? $value['type'] : null;
         $required = $value['required'] ?? null;
 
         return new self(
@@ -61,7 +61,7 @@ readonly class CustomerConsent
             type: $type,
             required: is_bool($required) ? $required : $status !== 'VERIFIED',
             autoAccept: ($value['autoAccept'] ?? null) === true,
-            linkSent: ($value['linkSent'] ?? null) === true,
+            linkSent: ($value['linkSent'] ?? null)     === true,
         );
     }
 

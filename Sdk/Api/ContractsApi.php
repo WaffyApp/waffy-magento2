@@ -47,7 +47,7 @@ class ContractsApi
 
         $segments = array_values(array_filter(
             explode('/', $parts['path'] ?? ''),
-            static fn(string $segment): bool => $segment !== '',
+            static fn (string $segment): bool => $segment !== '',
         ));
         $shortId = $segments === [] ? '' : $segments[count($segments) - 1];
 
@@ -70,9 +70,9 @@ class ContractsApi
     public function createContract(string $merchantToken, ProductInfo $product): string
     {
         $response = $this->http->apiPost($merchantToken, '/api/external/contracts', [
-            'type'               => 'COMPLEX_CONTRACT',
-            'senderRole'         => 'PROVIDER',
-            'itemDetail'         => [
+            'type'       => 'COMPLEX_CONTRACT',
+            'senderRole' => 'PROVIDER',
+            'itemDetail' => [
                 'title'       => $product->title,
                 'description' => $product->description,
                 'images'      => $product->images,
@@ -103,9 +103,9 @@ class ContractsApi
         MilestoneInfo $milestone,
     ): PreparedContract {
         $milestonePayload = [
-            'type'               => 'MILESTONE_CONTRACT',
-            'senderRole'         => 'PROVIDER',
-            'itemDetail'         => [
+            'type'       => 'MILESTONE_CONTRACT',
+            'senderRole' => 'PROVIDER',
+            'itemDetail' => [
                 'title'       => $product->title,
                 'description' => $product->description,
             ],
@@ -119,7 +119,7 @@ class ContractsApi
 
         if (!empty($milestone->addOnFees)) {
             $milestonePayload['addOnFees'] = array_map(
-                static fn($fee) => $fee->toArray(),
+                static fn ($fee) => $fee->toArray(),
                 $milestone->addOnFees,
             );
         }
@@ -161,7 +161,7 @@ class ContractsApi
             '/api/external/contracts/' . $contractId . '/parties',
             [
                 'mileStonesParties' => [
-                    $milestoneId => array_map(static fn(Party $p) => $p->toArray(), $parties),
+                    $milestoneId => array_map(static fn (Party $p) => $p->toArray(), $parties),
                 ],
             ],
         );

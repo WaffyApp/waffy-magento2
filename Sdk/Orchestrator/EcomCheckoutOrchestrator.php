@@ -175,7 +175,7 @@ class EcomCheckoutOrchestrator
     public function initiateCheckout(CheckoutRequest $request): CheckoutResult
     {
         return TokenCache::retryOnUnauthorized(
-            fn(bool $useCache): CheckoutResult => $this->runCheckout($request, $useCache),
+            fn (bool $useCache): CheckoutResult => $this->runCheckout($request, $useCache),
         );
     }
 
@@ -243,7 +243,7 @@ class EcomCheckoutOrchestrator
 
         return $this->progress->tracked(
             CheckoutStep::CustomerToken,
-            fn(): string => $this->auth->fetchPaymentTicket(
+            fn (): string => $this->auth->fetchPaymentTicket(
                 $request->clientId,
                 $request->clientSecret,
                 $request->customer->phoneNumber,
@@ -298,12 +298,12 @@ class EcomCheckoutOrchestrator
         // this point: its payment ticket is scoped to a contract that does not
         // exist yet, so that half happens after the contract instead.
         $customerToken = '';
-        $consent = null;
+        $consent       = null;
 
         if ($this->isKeycloak) {
             $registration = $this->progress->tracked(
                 CheckoutStep::CustomerSignUp,
-                fn() => $this->partner->registerCustomer($appToken, $request->customer, $request->consentMethod),
+                fn () => $this->partner->registerCustomer($appToken, $request->customer, $request->consentMethod),
             );
             if ($registration->consentRequired()) {
                 throw new AuthException(
@@ -324,7 +324,7 @@ class EcomCheckoutOrchestrator
 
         // ── Steps 4–7: the contract itself ──────────────────────────────────
         // Never cacheable: every order is a new contract, so these always run.
-        $contract = $this->runPrepareContract($merchantToken, $request);
+        $contract   = $this->runPrepareContract($merchantToken, $request);
         $paymentUrl = $this->runStartPayment($merchantToken, $request, $contract);
 
         if (!$this->isKeycloak) {
@@ -350,12 +350,12 @@ class EcomCheckoutOrchestrator
     {
         $contractId = $this->progress->tracked(
             CheckoutStep::CreateContract,
-            fn(): string => $this->contracts->createContract($merchantToken, $request->product),
+            fn (): string => $this->contracts->createContract($merchantToken, $request->product),
         );
 
         $contract = $this->progress->tracked(
             CheckoutStep::CreateMilestone,
-            fn(): PreparedContract => $this->contracts->createMilestone($merchantToken, $contractId, $request->product, $request->milestone),
+            fn (): PreparedContract => $this->contracts->createMilestone($merchantToken, $contractId, $request->product, $request->milestone),
         );
 
         $this->progress->tracked(
@@ -377,7 +377,7 @@ class EcomCheckoutOrchestrator
     {
         return $this->progress->tracked(
             CheckoutStep::StartPayment,
-            fn(): string => $this->contracts->startPayment(
+            fn (): string => $this->contracts->startPayment(
                 $merchantToken,
                 $contract->milestoneId,
                 $request->clientId,

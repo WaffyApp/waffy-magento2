@@ -108,7 +108,7 @@ class WaffyException extends RuntimeException
             foreach ($node as $key => $value) {
                 if (
                     is_string($value) && $value !== ''
-                    && in_array($key, ['message', 'defaultMessage', 'reason', 'detail', 'errorMessage'], true)
+                                      && in_array($key, ['message', 'defaultMessage', 'reason', 'detail', 'errorMessage'], true)
                 ) {
                     $messages[] = $value;
                 } elseif (is_array($value)) {

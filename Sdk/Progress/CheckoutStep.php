@@ -52,7 +52,7 @@ enum CheckoutStep: string
     {
         return match ($this) {
             self::AppToken, self::MerchantToken, self::CustomerSignUp, self::CustomerToken => true,
-            default => false,
+            default                                                                        => false,
         };
     }
 

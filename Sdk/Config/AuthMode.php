@@ -27,7 +27,7 @@ namespace Waffy\Ecommerce\Config;
  */
 enum AuthMode: string
 {
-    case Legacy = 'legacy';
+    case Legacy   = 'legacy';
     case Keycloak = 'keycloak';
 
     /**

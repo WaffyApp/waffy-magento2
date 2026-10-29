@@ -87,7 +87,7 @@ readonly class Party
         $data = $this->phoneNumber !== null
             ? ['phoneNumber' => $this->phoneNumber]
             : ['userId' => $this->userId];
-        $data['role'] = $this->role;
+        $data['role']   = $this->role;
         $data['amount'] = $this->amount;
         if ($this->isSender) {
             $data['isSender'] = true;

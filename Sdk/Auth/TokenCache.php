@@ -113,7 +113,7 @@ class TokenCache
         } else {
             $this->tokenStore->storeAppToken($clientId, $this->progress->tracked(
                 CheckoutStep::AppToken,
-                fn(): string => $this->auth->fetchAppToken($clientId, $clientSecret),
+                fn (): string => $this->auth->fetchAppToken($clientId, $clientSecret),
             ));
             $refreshed[] = 'app';
         }
@@ -123,7 +123,7 @@ class TokenCache
         } else {
             $this->tokenStore->storeMerchantToken($clientId, $this->progress->tracked(
                 CheckoutStep::MerchantToken,
-                fn(): string => $this->auth->fetchMerchantToken($clientId, $clientSecret, $clientAdminEmail, $clientAdminPassword),
+                fn (): string => $this->auth->fetchMerchantToken($clientId, $clientSecret, $clientAdminEmail, $clientAdminPassword),
             ));
             $refreshed[] = 'merchant';
         }
@@ -190,7 +190,7 @@ class TokenCache
 
         $clientUserToken = $this->progress->tracked(
             CheckoutStep::CustomerSignUp,
-            fn(): string => $this->auth->signUpCustomer(
+            fn (): string => $this->auth->signUpCustomer(
                 $appToken,
                 $clientUserId,
                 $customer->phoneNumber,
@@ -202,7 +202,7 @@ class TokenCache
         // Step 3 — buyer password grant, using the opaque step-2 token as password.
         $customerToken = $this->progress->tracked(
             CheckoutStep::CustomerToken,
-            fn(): string => $this->auth->fetchCustomerToken(
+            fn (): string => $this->auth->fetchCustomerToken(
                 $clientId,
                 $clientSecret,
                 $customer->phoneNumber,
@@ -231,7 +231,7 @@ class TokenCache
 
         $token = $this->progress->tracked(
             CheckoutStep::AppToken,
-            fn(): string => $this->auth->fetchAppToken($clientId, $clientSecret),
+            fn (): string => $this->auth->fetchAppToken($clientId, $clientSecret),
         );
         $this->tokenStore->storeAppToken($clientId, $token);
 
@@ -256,7 +256,7 @@ class TokenCache
 
         $token = $this->progress->tracked(
             CheckoutStep::MerchantToken,
-            fn(): string => $this->auth->fetchMerchantToken($clientId, $clientSecret, $clientAdminEmail, $clientAdminPassword),
+            fn (): string => $this->auth->fetchMerchantToken($clientId, $clientSecret, $clientAdminEmail, $clientAdminPassword),
         );
         $this->tokenStore->storeMerchantToken($clientId, $token);
 

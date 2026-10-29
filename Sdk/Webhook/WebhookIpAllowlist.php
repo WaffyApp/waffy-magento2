@@ -43,9 +43,9 @@ class WebhookIpAllowlist
 
         // IPv4 CIDR match.
         [$subnet, $bits] = explode('/', $entry, 2);
-        $ipLong     = ip2long($clientIp);
-        $subnetLong = ip2long($subnet);
-        $bits       = (int) $bits;
+        $ipLong          = ip2long($clientIp);
+        $subnetLong      = ip2long($subnet);
+        $bits            = (int) $bits;
 
         if ($ipLong === false || $subnetLong === false || $bits < 0 || $bits > 32) {
             return false;

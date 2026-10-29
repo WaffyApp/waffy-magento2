@@ -18,7 +18,7 @@ namespace Waffy\Ecommerce\Config;
  */
 enum Environment: string
 {
-    case Sandbox = 'sandbox';
+    case Sandbox    = 'sandbox';
     case Production = 'production';
 
     public function authBaseUrl(): string

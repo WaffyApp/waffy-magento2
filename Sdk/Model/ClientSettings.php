@@ -28,7 +28,7 @@ readonly class ClientSettings
     /** @param array<string, mixed> $body */
     public static function fromResponse(array $body): self
     {
-        $clientId = $body['clientId'] ?? null;
+        $clientId  = $body['clientId']          ?? null;
         $loginMode = $body['checkoutLoginMode'] ?? null;
 
         return new self(

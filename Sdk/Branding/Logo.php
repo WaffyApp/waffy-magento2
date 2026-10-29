@@ -23,7 +23,7 @@ namespace Waffy\Ecommerce\Branding;
 class Logo
 {
     /** Intrinsic size of the artwork — the viewBox it was drawn at. */
-    public const WIDTH = 60;
+    public const WIDTH  = 60;
     public const HEIGHT = 36;
 
     /** Brand blue used by the wordmark; exposed so callers can match it. */

@@ -84,8 +84,8 @@ readonly class WaffyEnvFile
             throw new ValidationException(implode("\n", $errors));
         }
 
-        $get = static fn(string $key): string => trim((string) ($values[$key] ?? ''));
-        $optional = static fn(string $key): ?string => $get($key) === '' ? null : $get($key);
+        $get      = static fn (string $key): string => trim((string) ($values[$key] ?? ''));
+        $optional = static fn (string $key): ?string => $get($key) === '' ? null : $get($key);
 
         return new self(
             environment:      $expected,
@@ -111,7 +111,7 @@ readonly class WaffyEnvFile
     public static function errors(array $values, Environment $expected): array
     {
         $errors = [];
-        $get = static fn(string $key): string => trim((string) ($values[$key] ?? ''));
+        $get    = static fn (string $key): string => trim((string) ($values[$key] ?? ''));
 
         foreach (self::REQUIRED_KEYS as $key) {
             if ($get($key) === '') {
@@ -133,7 +133,7 @@ readonly class WaffyEnvFile
             $detected[] = self::environmentOf($url);
         }
 
-        $detected = array_values(array_unique(array_map(static fn(Environment $e): string => $e->value, $detected)));
+        $detected = array_values(array_unique(array_map(static fn (Environment $e): string => $e->value, $detected)));
         if (count($detected) > 1) {
             $errors['environment'] = 'These addresses mix sandbox (dev/stg) and live hosts — use the file of a single environment.';
         } elseif ($detected !== [] && $detected[0] !== $expected->value) {
@@ -182,7 +182,7 @@ readonly class WaffyEnvFile
      */
     public static function environmentOf(string $url): Environment
     {
-        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $host   = strtolower((string) parse_url($url, PHP_URL_HOST));
         $labels = preg_split('/[.\-]/', $host) ?: [];
 
         return array_intersect($labels, ['dev', 'stg']) !== [] ? Environment::Sandbox : Environment::Production;
@@ -206,7 +206,7 @@ readonly class WaffyEnvFile
             if (!is_array($row) || !is_string($row['key'] ?? null) || ($row['enabled'] ?? true) === false) {
                 continue;
             }
-            $value = $row['value'] ?? '';
+            $value               = $row['value'] ?? '';
             $values[$row['key']] = is_scalar($value) ? (string) $value : '';
         }
 

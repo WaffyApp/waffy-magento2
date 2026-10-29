@@ -30,12 +30,12 @@ readonly class ConsentLinkResult
     /** @param array<string, mixed> $body */
     public static function fromResponse(array $body): self
     {
-        $reason = $body['reason'] ?? null;
+        $reason     = $body['reason']                ?? null;
         $retryAfter = $body['retryAfterSeconds'] ?? null;
 
         return new self(
             sent: ($body['sent'] ?? null) === true,
-            reason: is_string($reason) && $reason !== '' ? $reason : null,
+            reason: is_string($reason)                                      && $reason !== '' ? $reason : null,
             retryAfterSeconds: is_int($retryAfter) || is_float($retryAfter) && is_finite($retryAfter) ? $retryAfter : null,
         );
     }

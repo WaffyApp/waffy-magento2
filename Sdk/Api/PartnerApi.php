@@ -72,7 +72,7 @@ class PartnerApi
             $body['consentMethod'] = $consentMethod;
         }
 
-        $data = $this->http->partnerPost($orgToken, '/customers', 'Waffy customer registration failed', $body);
+        $data                               = $this->http->partnerPost($orgToken, '/customers', 'Waffy customer registration failed', $body);
         [$waffyUserId, $userIdentification] = $this->customerIds($data, 'Waffy customer registration');
 
         return new CustomerRegistration(
@@ -104,7 +104,7 @@ class PartnerApi
         return $this->withOrgToken(
             $clientId,
             $clientSecret,
-            fn(string $orgToken): CustomerRegistration => $this->registerCustomer($orgToken, $customer, $consentMethod),
+            fn (string $orgToken): CustomerRegistration => $this->registerCustomer($orgToken, $customer, $consentMethod),
         );
     }
 
@@ -125,7 +125,7 @@ class PartnerApi
         $data = $this->withOrgToken(
             $clientId,
             $clientSecret,
-            fn(string $orgToken): array => $this->http->partnerPost($orgToken, '/otp/send', 'Waffy OTP send failed', [
+            fn (string $orgToken): array => $this->http->partnerPost($orgToken, '/otp/send', 'Waffy OTP send failed', [
                 'phoneNumber' => $phoneNumber,
             ]),
         );
@@ -159,7 +159,7 @@ class PartnerApi
         $body = ['phoneNumber' => $phoneNumber, 'otp' => $otp];
         if ($customer !== null) {
             $body['firstName'] = $customer->firstName;
-            $body['lastName'] = $customer->lastName;
+            $body['lastName']  = $customer->lastName;
             if ($customer->email !== null && $customer->email !== '') {
                 $body['email'] = $customer->email;
             }
@@ -168,7 +168,7 @@ class PartnerApi
         $data = $this->withOrgToken(
             $clientId,
             $clientSecret,
-            fn(string $orgToken): array => $this->http->partnerPost($orgToken, '/otp/verify', 'Waffy OTP verification failed', $body),
+            fn (string $orgToken): array => $this->http->partnerPost($orgToken, '/otp/verify', 'Waffy OTP verification failed', $body),
         );
         [$waffyUserId, $userIdentification] = $this->customerIds($data, 'Waffy OTP verification');
 
@@ -192,7 +192,7 @@ class PartnerApi
         $data = $this->withOrgToken(
             $clientId,
             $clientSecret,
-            fn(string $orgToken): array => $this->http->partnerPost($orgToken, '/consent/send', 'Waffy consent link send failed', [
+            fn (string $orgToken): array => $this->http->partnerPost($orgToken, '/consent/send', 'Waffy consent link send failed', [
                 'phoneNumber' => $phoneNumber,
             ]),
         );
@@ -213,7 +213,7 @@ class PartnerApi
         $data = $this->withOrgToken(
             $clientId,
             $clientSecret,
-            fn(string $orgToken): array => $this->http->partnerGet($orgToken, '/customers/consent', 'Waffy consent lookup failed', [
+            fn (string $orgToken): array => $this->http->partnerGet($orgToken, '/customers/consent', 'Waffy consent lookup failed', [
                 'phoneNumber' => $phoneNumber,
             ]),
         );
@@ -232,7 +232,7 @@ class PartnerApi
         $data = $this->withOrgToken(
             $clientId,
             $clientSecret,
-            fn(string $orgToken): array => $this->http->partnerGet($orgToken, '/client', 'Waffy client settings request failed'),
+            fn (string $orgToken): array => $this->http->partnerGet($orgToken, '/client', 'Waffy client settings request failed'),
         );
 
         return ClientSettings::fromResponse($data);
@@ -257,7 +257,7 @@ class PartnerApi
     private function withOrgToken(string $clientId, string $clientSecret, callable $call): mixed
     {
         return TokenCache::retryOnUnauthorized(
-            fn(bool $useCache): mixed => $call($this->tokens->ensureAppToken($clientId, $clientSecret, $useCache)),
+            fn (bool $useCache): mixed => $call($this->tokens->ensureAppToken($clientId, $clientSecret, $useCache)),
         );
     }
 

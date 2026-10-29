@@ -271,7 +271,7 @@ class AuthApi
                     'login_hint' => $phoneNumber,
                     'scope'      => 'payment:' . $contractShortId,
                 ],
-                'headers'     => ['Accept' => 'application/json'],
+                'headers' => ['Accept' => 'application/json'],
             ]);
         } catch (GuzzleException $e) {
             throw $this->http->authError('Waffy payment ticket request failed', $e);
